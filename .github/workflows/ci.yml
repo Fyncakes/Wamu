@@ -1,0 +1,101 @@
+name: WAMU CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wamu-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: wamu-backend/requirements.txt
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx aiosqlite
+      - name: Test
+        env:
+          ENVIRONMENT: development
+          DEBUG: "true"
+          OTP_MOCK_MODE: "true"
+          PAYMENT_MOCK_AUTO_SUCCESS: "true"
+          PAYMENT_WEBHOOK_SECRET: ci-webhook-secret-for-tests-only
+          SECRET_KEY: ci-test-secret-key-at-least-32-chars!!
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          CORS_ORIGINS: '["http://localhost:3000"]'
+          REALTIME_USE_REDIS: "false"
+        run: pytest -q
+      - name: Alembic greenfield (empty DB → head)
+        env:
+          ENVIRONMENT: development
+          DEBUG: "true"
+          OTP_MOCK_MODE: "true"
+          PAYMENT_MOCK_AUTO_SUCCESS: "true"
+          PAYMENT_WEBHOOK_SECRET: ci-webhook-secret-for-tests-only
+          SECRET_KEY: ci-test-secret-key-at-least-32-chars!!
+          DATABASE_URL: sqlite+aiosqlite:////tmp/wamu_ci_alembic.db
+          CORS_ORIGINS: '["http://localhost:3000"]'
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current | grep -q 0012_order_disputes
+          python -m alembic upgrade head
+      - name: Production config fail-closed
+        run: python -m scripts.check_production_config
+
+  mobile:
+    name: Flutter analyze + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wamu-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+
+  admin:
+    name: Admin lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wamu-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: wamu-admin/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000/api/v1
+
+  compose:
+    name: Compose config validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose files
+        run: |
+          docker compose -f infrastructure/docker-compose.yml config >/dev/null
+          docker compose -f infrastructure/docker-compose.staging.yml config >/dev/null
+          docker compose -f infrastructure/docker-compose.yml \
+            -f infrastructure/docker-compose.https.yml config >/dev/null

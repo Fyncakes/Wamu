@@ -66,4 +66,3 @@ specs/_wa_frames/
 # Cursor / agent
 .cursor/
 **/agent-transcripts/
-.github/workflows/
