@@ -1,0 +1,19 @@
+# Optional LAN HTTPS in front of the API (self-signed — phones must trust once).
+# Generate certs first:  ./infrastructure/certs/generate_self_signed.sh
+# Then:
+#   docker compose -f infrastructure/docker-compose.yml \
+#     -f infrastructure/docker-compose.https.yml up -d
+#
+# Phone / APK base URL: https://<PC_LAN_IP>:8443/api/v1
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+    depends_on:
+      api:
+        condition: service_healthy

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wamu — Link your phone</title>
+<style>
+  :root { --bg:#0b1f17; --card:#132a21; --text:#e8f5ef; --muted:#a8c4b6; --accent:#25d366; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; background:
+    radial-gradient(ellipse at top, #0d3b2e 0%, var(--bg) 55%);
+    color: var(--text); margin:0; min-height:100vh; padding:24px; }
+  .card { max-width:440px; margin:32px auto; text-align:center; }
+  .brand { font-size:2.2rem; font-weight:800; letter-spacing:-0.02em; margin:0 0 6px; }
+  .tag { color: var(--muted); margin:0 0 28px; line-height:1.45; }
+  #qr { background:#fff; border-radius:16px; padding:16px; display:inline-block; margin:0 auto 20px; }
+  .url { display:block; word-break:break-all; background:var(--card); padding:14px 16px;
+    border-radius:12px; margin:12px 0 16px; font-size:0.95rem; text-align:left; }
+  button { background:var(--accent); color:#04210f; border:0; padding:14px 18px; border-radius:10px;
+    font-weight:700; font-size:1rem; width:100%; cursor:pointer; }
+  button:active { transform: scale(0.99); }
+  ol { text-align:left; padding-left:1.2rem; line-height:1.7; color:var(--muted); }
+  a { color: var(--accent); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head><body><div class="card">
+  <p class="brand">Wamu</p>
+  <p class="tag">Scan this QR with the Wamu app to link your phone.<br/>Connect. Chat. Discover. Do More.</p>
+  <div id="qr"></div>
+  <div class="url" id="u">__API__</div>
+  <button type="button" id="copy">Copy link</button>
+  <ol>
+    <li>Open <b>Wamu</b> on your phone</li>
+    <li>Open <b>Wamu</b> → <b>Wamu server</b> → <b>Scan QR code</b></li>
+    <li>Then sign in with OTP, or <b>Scan to sign in</b> using <b>My QR code</b> from a logged-in device</li>
+  </ol>
+  <p style="font-size:.85rem;color:var(--muted)">Server status:
+    <a href="__API__/health">health check</a></p>
+</div>
+<script>
+  const api = document.getElementById('u').innerText.trim();
+  QRCode.toCanvas(document.createElement('canvas'), api, { width: 240, margin: 1 }, function (err, canvas) {
+    if (err) { document.getElementById('qr').textContent = api; return; }
+    document.getElementById('qr').appendChild(canvas);
+  });
+  document.getElementById('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(api); document.getElementById('copy').textContent = 'Copied'; }
+    catch (_) { prompt('Copy this link', api); }
+  };
+</script>
+</body></html>

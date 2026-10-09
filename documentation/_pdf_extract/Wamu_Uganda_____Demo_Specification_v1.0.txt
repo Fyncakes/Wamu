@@ -1,0 +1,875 @@
+9/28/26, 1:19 PM                                    Wamu Uganda — Demo Specification v1.0
+
+
+
+
+     Wamu Uganda — Demo Specification v1.0
+     Purpose: A buildable, screen-by-screen specification for the fundable demo.
+     Audience: Solo developer building the demo in 6–10 weeks.
+     Philosophy: The demo must feel like nothing that exists in Uganda today. Not Jumia. Not WhatsApp.
+     Not TikTok. Not SafeBoda. All four, in one app, with a shared soul.
+     Version: 1.0
+     Date: 2026-09-27
+
+
+
+
+     1. Demo Purpose & Success Criteria
+
+     1.1 What the Demo Must Prove (in 10 minutes)
+       1. Discovery is social — short video feed of local businesses, not a product grid.
+       2. Commerce is conversational — chat is the store, not a cart.
+       3. Payment is local — MTN MoMo and Airtel Money, mocked but shown end to end.
+       4. Delivery is personal — a named, verified rider with a face, rating, and history.
+       5. The rider network is shared — the same rider does delivery and rides.
+
+       6. One account, many roles — a customer can become a rider, a merchant can become a
+          customer.
+
+
+     1.2 Success Criteria
+
+       Criterion             Target
+
+       Demo length           10 minutes live, 3 minutes video
+
+       Screens shown         14–18 screens across 3 apps
+
+       "Wow" moments         At least 3 (video feed, chat ordering, rider switch)
+
+       Investor reaction     "This is not Jumia"
+
+       Technical stability   No crashes during a 10-minute walkthrough
+
+
+     1.3 What the Demo Does NOT Need
+
+https://md2pdf.netlify.app                                                                               1/20
+9/28/26, 1:19 PM                                       Wamu Uganda — Demo Specification v1.0
+
+           Real MTN MoMo / Airtel Money integration
+           Real SMS OTP
+           App store submission
+           Production security hardening
+           ML recommendations
+           Merchant settlement and payouts
+           Groups, communities, status
+           Voice/video calls
+           Passenger transport beyond a toggle and one ride
+           Multi-city support
+
+     Cut everything on this list. Every hour on it is an hour stolen from the demo.
+
+
+
+
+     2. The Demo Story (Narrative)
+     The demo follows one customer, one merchant, and one rider through a complete loop. The
+     presenter narrates.
+
+
+     Characters (Seeded)
+
+       Role                  Name         Details
+
+       Customer              Sarah        28, works in Ntinda, orders lunch daily
+
+       Merchant              Mama Grace   Food stall in Kamwokya, sells fresh tilapia and matoke
+
+       Rider                 Ronald       32, boda rider, 340 deliveries, 120 rides, 4.8 rating
+
+
+     The Story
+         Sarah opens Wamu at lunch. She scrolls the video feed and sees Mama Grace cooking fresh
+         tilapia today. She taps the video, opens a chat, asks if tilapia is available, negotiates a price,
+         and places an order. She pays with MTN MoMo. Ronald, a verified rider she has used before,
+         picks up the order and delivers it. Sarah rates both. Then Sarah needs to go to town. She
+         opens Wamu Move. Ronald is still available. She requests a ride. Same rider, same app,
+         same account.
+
+     Every screen in the demo serves this story.
+
+https://md2pdf.netlify.app                                                                                    2/20
+9/28/26, 1:19 PM                                   Wamu Uganda — Demo Specification v1.0
+
+
+
+
+     3. Screen-by-Screen Specification
+
+     3.1 Customer App
+
+        Screen C1: Splash & Onboarding
+
+        Purpose: First impression. Show the ecosystem.
+
+              Wamu logo (green, clean)
+
+              Tagline: "Discover. Chat. Buy. Deliver. Ride."
+              Three value cards: "Watch local businesses" / "Chat and order instantly" / "Delivered by
+              verified riders"
+              "Get Started" button
+
+        Tap → Phone number screen.
+
+
+
+
+        Screen C2: Phone Login
+
+        Purpose: Show Uganda-first auth.
+
+              Phone number input (+256 prefix)
+              "Send Code" button
+
+              "By continuing you agree to Wamu's Terms"
+
+        Tap → OTP screen.
+
+
+
+
+https://md2pdf.netlify.app                                                                               3/20
+9/28/26, 1:19 PM                                  Wamu Uganda — Demo Specification v1.0
+
+
+        Screen C3: OTP Verification
+
+              6-digit OTP input
+
+              Auto-read from SMS (or manual for demo)
+              "Verify" button
+
+              Resend timer
+
+        Demo note: Use a fixed OTP ( 123456 ) for the demo. Real SMS later.
+
+        Tap → Profile setup.
+
+
+
+
+        Screen C4: Profile Setup
+
+        Purpose: Show one-account-many-roles model.
+
+              Name input: "Sarah"
+
+              Profile photo (optional)
+              Location permission: "Allow Wamu to find businesses near you"
+
+              Capability toggles: "I want to buy" (ON), "I own a business" (OFF), "I want to ride" (OFF)
+
+              "Continue" button
+
+        Demo note: Sarah keeps only "I want to buy" ON. Later, the presenter can toggle "I want to
+        ride" to show the same account becoming a rider.
+
+        Tap → Discover feed.
+
+
+
+
+https://md2pdf.netlify.app                                                                                 4/20
+9/28/26, 1:19 PM                                     Wamu Uganda — Demo Specification v1.0
+
+
+        Screen C5: Discover Feed (WOW MOMENT #1)
+
+        Purpose: Replace Jumia's product grid with a TikTok-style local business feed.
+
+              Full-screen vertical video (Mama Grace cooking tilapia)
+              Overlay bottom-left: Business name "Mama Grace Kitchen", verified badge, "1.2 km
+              away", rating 4.9 ★ (212 reviews)
+
+              Overlay bottom-right: Like, Comment, Share, Save
+              Overlay bottom-center: "Chat to Order" (primary CTA — not "Buy") and "Follow"
+
+              Top-right: Search icon, Profile icon
+
+              Swipe up for next video
+
+        Demo note: "This is not a product grid. This is what your neighborhood looks like today."
+
+        Tap "Chat to Order" → Chat screen.
+
+
+
+
+https://md2pdf.netlify.app                                                                          5/20
+9/28/26, 1:19 PM                                      Wamu Uganda — Demo Specification v1.0
+
+
+        Screen C6: Business Chat (WOW MOMENT #2)
+
+        Purpose: Replace cart/checkout with conversation.
+
+              Top bar: Mama Grace's photo, "Mama Grace Kitchen", verified badge, "Online" indicator
+
+              Message thread:
+
+                     Sarah: "Hi Mama Grace, do you have tilapia today?"
+
+                     Mama Grace: "Yes! Fresh from the lake this morning. 15k each."
+                     Sarah: "Can you do 2 for 25k?"
+
+                     Mama Grace: "Yes, for you."
+
+                     Sarah: "Send to my office at Ntinda."
+
+                     Mama Grace: [sends an order card]
+              Order card: 2× Fresh Tilapia — 25,000 UGX, Delivery to Ntinda, ETA 35 min, "Pay Now"
+              button
+
+              Bottom bar: text input, camera, voice note, attach
+
+        Demo note: "There is no cart. There is no checkout page. The order happens in the
+        conversation."
+
+        Tap "Pay Now" → Payment screen.
+
+
+
+
+        Screen C7: Payment
+
+        Purpose: Show Uganda-first payment.
+
+              Order summary
+              Payment methods: MTN Mobile Money (selected), Airtel Money, Cash on Delivery
+              Amount: 25,000 UGX + 3,000 delivery = 28,000 UGX
+
+              "Pay with MTN MoMo" button
+
+        Tap → MoMo confirmation simulation.
+
+
+
+
+https://md2pdf.netlify.app                                                                            6/20
+9/28/26, 1:19 PM                                    Wamu Uganda — Demo Specification v1.0
+
+
+        Screen C8: MoMo Confirmation (Mocked)
+
+              "Check your phone for the MoMo prompt"
+              Simulated notification: "Wamu is requesting 28,000 UGX. Enter PIN to confirm."
+              Loading spinner
+
+              "Payment Confirmed" (simulated webhook)
+              Order state: CONFIRMED
+
+        Demo note: "We are integrated with MTN MoMo and Airtel Money. This is the same flow your
+        customers already know."
+
+        Tap → Order tracking screen.
+
+
+
+
+        Screen C9: Order Tracking (WOW MOMENT #3)
+
+        Purpose: Show a named, verified rider — not an anonymous delivery.
+
+              Map with Mama Grace's location, Sarah's location, and Ronald's moving marker
+              Rider card: Ronald's photo, "Ronald K." + verified badge, 4.8 ★ · 340 deliveries · 120
+              rides, "Wamu Rider #R-2841", Call button, Chat button
+
+              ETA: "12 minutes away"
+              Order state timeline:   ✅ Confirmed · ✅ Preparing · ✅ Picked up · 🔄 In transit · ⏳
+              Delivered
+
+        Demo note: "This is Ronald. He has a name. He has a face. He has a history. He did 340
+        deliveries and 120 rides last month. This is not a warehouse. This is your neighborhood."
+
+
+
+
+https://md2pdf.netlify.app                                                                             7/20
+9/28/26, 1:19 PM                                 Wamu Uganda — Demo Specification v1.0
+
+
+        Screen C10: Rating
+
+              "How was your order?"
+
+              Rate Mama Grace: 5 stars
+              Rate Ronald: 5 stars
+
+              Optional comment
+              "Submit" button
+
+        Tap → Back to Discover feed.
+
+
+
+
+        Screen C11: Wamu Move — Ride Request
+
+        Purpose: Show the shared rider network.
+
+              Map with pickup and destination input
+              Destination: "Kampala Road"
+
+              Fare estimate: 8,000 UGX
+              "Request Ride" button
+
+        Tap → Rider matching.
+
+
+
+
+https://md2pdf.netlify.app                                                               8/20
+9/28/26, 1:19 PM                                  Wamu Uganda — Demo Specification v1.0
+
+
+        Screen C12: Rider Match — Ronald Again (FINAL WOW)
+
+        Purpose: The moment the investor leans forward.
+
+              "Matching you with a rider..."
+              Ronald's card: "Ronald K. is 2 minutes away", same verified badge, same rating, same
+              history
+
+              Note: "Ronald also does deliveries on Wamu"
+              "Ronald is on his way" + live map
+
+              Trip state: ACCEPTED → EN_ROUTE_PICKUP
+
+        Demo note: "Ronald just delivered Sarah's lunch. Now he is taking her to town. Same rider.
+        Same app. Same account. This is the shared rider network. No other app in Uganda does
+        this."
+
+
+
+
+     3.2 Merchant App (Same Flutter App, Merchant Role)
+
+        Screen M1: Merchant Dashboard
+
+              "Welcome, Mama Grace"
+
+              Today's stats: Orders: 14 · Revenue: 210,000 UGX · Rating: 4.9 ★
+              Quick actions: "Post a Video", "View Orders", "Chat with Customers"
+
+
+
+
+        Screen M2: Incoming Order
+
+              Order card from Sarah: 2× Fresh Tilapia — 25,000 UGX, Delivery to Ntinda, Customer:
+              Sarah
+
+              "Accept" / "Reject" buttons
+
+        Tap "Accept" → Order state CONFIRMED .
+
+
+
+
+https://md2pdf.netlify.app                                                                           9/20
+9/28/26, 1:19 PM                                     Wamu Uganda — Demo Specification v1.0
+
+
+        Screen M3: Order Preparation
+
+              Order details
+
+              "Mark as Ready" button
+              Chat with Sarah (inline)
+
+        Tap "Mark as Ready" → Order state READY . Backend dispatches rider.
+
+
+
+
+        Screen M4: Post a Video
+
+              Camera / upload
+
+              Caption: "Fresh tilapia today!"
+              Tags: Food, Kamwokya, Tilapia
+              "Post" button
+
+        Demo note: Show that this video appears in the customer's Discover feed immediately.
+
+
+
+
+     3.3 Rider App (Same Flutter App, Rider Role)
+
+        Screen R1: Rider Dashboard
+
+              "Welcome, Ronald"
+              Availability toggles: Available for Delivery (ON), Available for Rides (ON)
+
+              Today's stats: Deliveries: 8 · Rides: 3 · Earnings: 42,000 UGX
+              Verification badge: "Verified Rider"
+
+        Demo note: The toggle is the key. One rider, two service types.
+
+
+
+
+https://md2pdf.netlify.app                                                                     10/20
+9/28/26, 1:19 PM                               Wamu Uganda — Demo Specification v1.0
+
+
+        Screen R2: Incoming Delivery Request
+
+              Pickup: Mama Grace Kitchen (1.2 km)
+              Dropoff: Ntinda (3.5 km)
+
+              Estimated earnings: 3,000 UGX
+              "Accept" / "Decline"
+
+        Tap "Accept" → State ACCEPTED .
+
+
+
+
+        Screen R3: Navigation to Pickup
+
+              Map with route
+              Turn-by-turn (simple)
+              "Arrived at Pickup" button
+
+        Tap → State AT_PICKUP .
+
+
+
+
+        Screen R4: Pickup Confirmation
+
+              Order details
+              "Confirm Pickup" button
+
+        Tap → State PICKED_UP → IN_TRANSIT .
+
+
+
+
+        Screen R5: Navigation to Dropoff
+
+              Map with route
+              Customer chat button
+
+              "Arrived at Dropoff" button
+
+        Tap → State NEAR_DESTINATION .
+
+
+
+
+https://md2pdf.netlify.app                                                             11/20
+9/28/26, 1:19 PM                                  Wamu Uganda — Demo Specification v1.0
+
+
+        Screen R6: Delivery Complete
+
+              "Confirm Delivery" button
+              Optional: photo proof
+              Earnings updated: +3,000 UGX
+
+        Tap → State DELIVERED .
+
+
+
+
+        Screen R7: Incoming Ride Request (SHARED NETWORK)
+
+              Pickup: Sarah's current location (1.5 km)
+              Dropoff: Kampala Road (4.2 km)
+              Estimated earnings: 8,000 UGX
+
+              "Accept" / "Decline"
+
+        Tap "Accept" → Ride state ACCEPTED .
+
+        Demo note: Same rider, different service type. This is the shared network.
+
+
+
+
+     3.4 Admin Panel (Web)
+
+        Screen A1: Dashboard
+
+              Total users, merchants, riders
+              Orders today, Deliveries today, Rides today
+
+              Revenue
+              Active riders on map
+
+
+
+
+        Screen A2: Merchant Verification
+
+              List of pending merchants
+              Verify / Reject buttons
+
+
+
+
+https://md2pdf.netlify.app                                                                12/20
+9/28/26, 1:19 PM                                      Wamu Uganda — Demo Specification v1.0
+
+
+        Screen A3: Rider Verification
+
+              List of pending riders
+
+              View ID, selfie, vehicle, plate
+              Approve / Reject
+
+
+
+
+        Screen A4: Order Monitoring
+
+              Live order list
+              Filters: status, city, merchant
+
+              Click to see details
+
+
+
+
+     4. Data Model for the Demo
+
+     4.1 Seed Data
+
+       Entity                Count   Examples
+
+       Users                 5       Sarah, Mama Grace, Ronald, +2
+
+       Businesses            3       Mama Grace Kitchen, Kato Electronics, Amina Salon
+
+       Products              9       3 per business
+
+       Videos                6       2 per business
+
+       Riders                2       Ronald, +1
+
+       Orders                3       Various states
+
+       Rides                 1       Completed
+
+
+     4.2 Demo Database Tables (Minimal)
+
+
+
+
+https://md2pdf.netlify.app                                                                    13/20
+9/28/26, 1:19 PM                            Wamu Uganda — Demo Specification v1.0
+
+
+         users
+         businesses
+         products
+         videos
+         conversations
+         messages
+         orders
+         order_items
+         payments
+         riders
+         deliveries
+         rides
+         ratings
+
+
+
+
+     5. Backend Endpoints for the Demo
+
+     5.1 Auth
+
+         POST /api/v1/auth/request-otp
+         POST /api/v1/auth/verify-otp
+         GET /api/v1/auth/me
+
+
+
+     5.2 Discover
+
+         GET /api/v1/discover/videos
+         POST /api/v1/videos/{id}/like
+         POST /api/v1/videos/{id}/follow
+
+
+
+     5.3 Chat
+
+         GET /api/v1/conversations
+         GET /api/v1/conversations/{id}/messages
+         POST /api/v1/conversations/{id}/messages
+
+
+
+     5.4 Orders
+
+
+
+
+https://md2pdf.netlify.app                                                          14/20
+9/28/26, 1:19 PM                             Wamu Uganda — Demo Specification v1.0
+
+
+         POST /api/v1/orders
+         GET /api/v1/orders/{id}
+         POST /api/v1/orders/{id}/accept
+         POST /api/v1/orders/{id}/ready
+
+
+
+     5.5 Payments (Mocked)
+
+         POST /api/v1/payments
+         POST /api/v1/payments/webhook (simulated)
+
+
+
+     5.6 Delivery
+
+         POST /api/v1/deliveries
+         POST /api/v1/deliveries/{id}/accept
+         POST /api/v1/deliveries/{id}/pickup
+         POST /api/v1/deliveries/{id}/complete
+
+
+
+     5.7 Rides
+
+         POST /api/v1/rides
+         POST /api/v1/rides/{id}/accept
+         POST /api/v1/rides/{id}/start
+         POST /api/v1/rides/{id}/complete
+
+
+
+     5.8 Rider
+
+         GET /api/v1/riders/me
+         PATCH /api/v1/riders/availability
+
+
+
+
+     6. What Is Real vs Mocked
+
+
+
+
+https://md2pdf.netlify.app                                                           15/20
+9/28/26, 1:19 PM                                     Wamu Uganda — Demo Specification v1.0
+
+       Feature                      Real or Mocked      Notes
+
+       Auth (OTP)                   Mocked              Fixed OTP 123456 for demo
+
+       Video feed                   Real                Seeded videos, real playback
+
+       Chat                         Real                WebSocket or polling
+
+       Order flow                   Real                Full state machine
+
+       Payment                      Mocked              Simulated MoMo webhook
+
+       Maps                         Real                Google Maps free tier
+
+       Rider tracking               Real                Simulated GPS updates every 3 sec
+
+       Ride flow                    Real                Same as delivery, different state machine
+
+       Push notifications           Mocked              In-app banners
+
+       SMS                          Mocked              No real SMS for demo
+
+       Merchant settlement          Not built           Out of scope
+
+       ML recommendations           Not built           Simple ranking for feed
+
+
+
+
+     7. Build Order (6 Weeks)
+
+     Week 1: Foundation
+           Project setup (Flutter + FastAPI + PostgreSQL)
+           Database schema
+
+           Auth endpoints + screens (C1–C4)
+           Seed data script
+
+
+     Week 2: Discover
+           Video feed screen (C5)
+
+           Video upload (M4)
+           Like, follow endpoints
+
+
+     Week 3: Chat & Orders
+
+https://md2pdf.netlify.app                                                                          16/20
+9/28/26, 1:19 PM                                Wamu Uganda — Demo Specification v1.0
+
+           Chat screen (C6)
+           Order card
+
+           Order state machine
+           Merchant order screens (M1–M3)
+
+
+     Week 4: Payment & Delivery
+           Payment screen (C7–C8)
+
+           Delivery state machine
+           Rider screens (R1–R6)
+           Order tracking (C9)
+
+
+     Week 5: Rides & Polish
+           Ride request (C11–C12)
+           Rider ride screens (R7)
+           Ratings (C10)
+           Admin panel (A1–A4)
+
+
+     Week 6: Demo Prep
+           Seed data refinement
+           Demo script rehearsal
+           Bug fixes
+           Record demo video
+
+           Prepare pitch deck
+
+
+
+
+     8. Demo Script (10 Minutes)
+
+     Minute 0–1: Hook
+         "In Uganda, you use 4 apps to do what should take 1. WhatsApp to chat. TikTok to discover.
+         SafeBoda to deliver. Your phone to pay. Wamu puts all of that in one app. Let me show you."
+
+
+     Minute 1–3: Discover
+
+https://md2pdf.netlify.app                                                                             17/20
+9/28/26, 1:19 PM                                   Wamu Uganda — Demo Specification v1.0
+
+         Show the video feed. Swipe through 2–3 businesses. "This is not a product grid. This is your
+         neighborhood today."
+
+
+     Minute 3–5: Chat & Order
+         Open Mama Grace's video. Tap "Chat to Order." Show the conversation. Show the order
+         card. "There is no cart. The conversation is the store."
+
+
+     Minute 5–6: Pay
+         Tap "Pay Now." Show MoMo flow. "This is the payment method Ugandans already use."
+
+
+     Minute 6–8: Delivery
+         Show Ronald on the map. "This is Ronald. He has a name, a face, and a history. He did 340
+         deliveries and 120 rides last month." Show tracking until delivered. Rate.
+
+
+     Minute 8–9: Ride (The Closer)
+         Open Wamu Move. Request a ride. Ronald accepts. "Ronald just delivered lunch. Now he is
+         taking Sarah to town. Same rider. Same app. Same account. No other app in Uganda does
+         this."
+
+
+     Minute 9–10: Close
+         "Jumia built a warehouse. We are building a neighborhood. Jumia uses cards. We use MoMo.
+         Jumia ships in days. We deliver in minutes. Jumia is a company. Wamu is a community. We
+         are not building another Jumia. We are building the app that replaces the 4 apps Ugandans
+         already use every day."
+
+
+
+
+     9. Success Criteria (Revisited)
+     After the demo, the investor should be able to answer "yes" to:
+
+       1. Is this different from Jumia?
+       2. Does this feel like Uganda?
+
+       3. Does the rider network make sense?
+       4. Can this scale beyond Kampala?
+       5. Is the team capable?
+
+https://md2pdf.netlify.app                                                                              18/20
+9/28/26, 1:19 PM                                      Wamu Uganda — Demo Specification v1.0
+
+       6. Is the ask clear?
+
+     If any answer is "no," the demo failed.
+
+
+
+
+     10. What Comes After the Demo
+     If funding is secured:
+
+       1. Replace mocked payments with real MTN MoMo and Airtel Money integrations.
+       2. Add real OTP via SMS provider.
+       3. Add push notifications via FCM.
+       4. Harden security (encryption, audit logs, rate limiting).
+       5. Build merchant settlement and rider payouts.
+       6. Add admin tools for verification, disputes, refunds.
+
+       7. Launch in one Kampala neighborhood with 20 merchants, 50 riders.
+       8. Measure the loop — orders/day, repeat rate, delivery time.
+       9. Expand to more neighborhoods once the loop is stable.
+
+
+
+
+     11. Summary: What Changed From the Original Document
+
+       Original Document                Revised Demo Spec
+
+       MVP is commerce + delivery       MVP is discovery + chat + shared rider network
+
+       Video is Phase 3                 Video is the home screen
+
+       Chat is Phase 2                  Chat is the ordering interface
+
+       Rides are Year 2                 Rides are in the demo
+
+       Catalog-first                    Video-first
+
+       Cart and checkout                Chat and order cards
+
+       Anonymous delivery               Named verified rider
+
+       Separate services                One shared rider network
+
+       Looks like Jumia                 Looks like nothing else in Uganda
+
+
+https://md2pdf.netlify.app                                                                    19/20
+9/28/26, 1:19 PM                                 Wamu Uganda — Demo Specification v1.0
+
+         The core message: The demo is not a smaller version of the full product. The demo is a
+         sharper version of the product's soul. It must lead with what makes Wamu different, not with
+         what makes it familiar.
+
+         Build the differentiators. Hide the rest. Win the room.
+
+
+
+                                         End of Demo Specification v1.0
+
+
+
+
+https://md2pdf.netlify.app                                                                              20/20
+

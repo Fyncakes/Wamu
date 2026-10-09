@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8faf9;
+  --foreground: #0f172a;
+  --wamu-primary: #0b6e4f;
+  --wamu-primary-dark: #085a40;
+  --wamu-primary-light: #e8f5f0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-wamu-50: #e8f5f0;
+  --color-wamu-100: #c5e6d9;
+  --color-wamu-200: #9ed4c0;
+  --color-wamu-300: #6fbf9f;
+  --color-wamu-400: #45a683;
+  --color-wamu-500: #0b6e4f;
+  --color-wamu-600: #0b6e4f;
+  --color-wamu-700: #085a40;
+  --color-wamu-800: #064530;
+  --color-wamu-900: #042f21;
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-fraunces);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+}

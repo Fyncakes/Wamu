@@ -1,0 +1,449 @@
+WAMU
+Unified Master Project Plan
+Transaction-first execution + social relationships + local economic network
+Version 3.0 • September 2026
+1. Executive Decision
+The revised Wamu project plan and the broader Wamu master vision can be combined. The recommended product strategy is not to discard either document, but to separate the product into a transaction core and relationship/discovery layers.
+The transaction-first plan should remain the execution backbone because it gives Wamu a measurable reason to exist from the first production release: Discover → Chat → Buy → Pay → Deliver → Review.
+The social/chat/community vision should remain the long-term network layer. It should be introduced progressively, beginning with transactional business chat and expanding into general relationships and communities once the commerce loop is stable.
+This creates one coherent product: Wamu is a social-economic network whose core engine is trusted local commerce.
+2. Reconciled Wamu Positioning
+Layer
+Wamu purpose
+Launch timing
+Transaction core
+Orders, payments, delivery, merchant operations
+MVP
+Transactional chat
+Customer ↔ merchant and order conversations
+MVP / Phase 2
+Social relationships
+Friends, relatives, follows, sharing
+After commerce validation
+Communities
+Family, church, school, neighborhood, professional groups
+After core retention
+Short-video discovery
+Business/product/service discovery
+After transaction loop
+Mobility
+Passenger rides using the rider network
+After delivery operations
+Business intelligence
+Analytics and AI decision support
+After meaningful transaction data
+B2B economy
+Supplier and wholesale commerce
+Later
+3. Product Vision
+Wamu is an Uganda-focused social-commerce and economic network connecting people, communities, businesses, products, payments, delivery and mobility.
+The long-term journey is:
+Connect → Communicate → Discover → Trust → Transact → Deliver → Repeat → Grow
+The first production loop is intentionally smaller:
+Discover → Chat → Buy → Pay → Deliver → Review
+4. Why the Two Plans Fit Together
+Existing revised project plan
+Broader master vision
+Adjustment
+Transaction-first
+Social-economic network
+Keep transaction-first as execution strategy
+Business chat
+General chat
+Launch business/order chat first; expand later
+Short video later
+Short video as discovery engine
+Keep later; make it commerce-linked
+Delivery
+Economic ecosystem
+Keep delivery as a core operational pillar
+Passenger mobility
+Rider ecosystem
+Reuse verified rider infrastructure later
+Business analytics
+AI business intelligence
+Start basic; expand after data exists
+B2B later
+Economic network
+Add only after B2C operations are reliable
+5. The Critical Change: Chat
+The project plan is correct to avoid launching a WhatsApp clone. However, chat should not be removed from the product vision. It should be split into two capabilities.
+5.1 Transactional chat — early
+Customer ↔ merchant chat.
+Order-linked conversations.
+Product cards shared inside chat.
+Delivery status updates in the order conversation.
+Customer support conversations.
+Receipts/order references inside relevant conversations.
+5.2 Social chat — later
+Friend-to-friend messaging.
+Family and friend groups.
+Communities.
+Voice notes and richer media.
+Status/stories.
+Social sharing between relationships.
+This resolves the apparent conflict: Wamu does not need general chat to prove its first value proposition, but chat remains a strategic pillar for the eventual social-economic network.
+6. Core MVP
+Area
+MVP requirement
+Priority
+Identity
+Phone OTP, account, session/device security
+P0
+Customer
+Nearby merchants, categories, product/service detail
+P0
+Merchant
+Onboarding, verification, profile, catalog
+P0
+Transactional chat
+Customer ↔ merchant/order conversation
+P0
+Orders
+Create, accept/reject, processing, ready, delivered/cancelled
+P0
+Payments
+MTN MoMo, Airtel Money, cash where operationally appropriate
+P0
+Delivery
+Request, rider assignment, pickup, tracking, proof of delivery
+P0
+Ratings
+Business/rider/order review
+P0
+Admin
+Verification, disputes, refunds, fraud/content controls
+P0
+Analytics
+Basic sales/order/merchant metrics
+P1
+General social chat
+Friends/groups
+Later
+Short-video feed
+Vertical business discovery
+Later
+7. Kampala Beachhead
+Start in Kampala with food and groceries because they provide frequent purchases, clear delivery needs, relatively understandable catalogs and measurable repeat behavior.
+Do not interpret this as a permanent restriction. It is a controlled learning environment.
+Phase 0: 10 merchants, approximately 20 riders, manual dispatch.
+Phase 1: production commerce and delivery MVP.
+Prove repeat orders, payment success, delivery reliability and merchant retention.
+Expand categories only when the operational loop is stable.
+Then introduce broader social and discovery features.
+8. Unified Roadmap
+Phase
+Indicative timing
+Main scope
+Gate to continue
+0. Concierge
+Weeks 0–6
+10 merchants, 20 riders, manual dispatch, real orders
+Repeat demand and delivery feasibility
+1. Commerce + Delivery
+Months 2–5
+Customer/merchant/rider apps, orders, payments, delivery
+Reliable completed transaction loop
+2. Transactional Chat
+Months 5–8
+Business chat, order chat, product sharing
+Businesses actively using Wamu conversations
+3. Discover
+Months 8–11
+Business videos, vertical feed, follows, comments, direct buy
+Discovery produces measurable commercial intent
+4. Social Relationships
+After core retention
+Friends, sharing, groups, communities
+Meaningful social retention without harming commerce
+5. Passenger Mobility
+Year 2
+Ride requests, matching, navigation, safety
+Delivery rider network has sufficient operational maturity
+6. Business Intelligence
+Year 2+
+Advanced analytics, AI recommendations, personalization
+Sufficient quality transaction/event data
+7. B2B + Regional
+Later
+Wholesale, suppliers, regional commerce
+Domestic platform economics and compliance support expansion
+9. Core Economic Flywheel
+The combined strategy creates two connected loops.
+Commerce loop: Discover → Chat → Buy → Pay → Deliver → Review → Repeat
+Social loop: Connect → Chat → Community → Share → Discover → Transact
+The loops reinforce each other. Social relationships create discovery and referrals; commerce creates useful reasons to return; business growth attracts more businesses and products.
+10. Short-Video Strategy
+Short video should not be built as a general entertainment clone. The primary content model is shoppable/local discovery.
+Business/product/service videos.
+Captions, descriptions and hashtags.
+Business/product/service link.
+Like, comment, share, save and follow.
+Nearby/category discovery.
+Direct Buy, Chat or View Business action.
+Attribution from video impression → product view → chat → order.
+11. Communities Strategy
+Communities become important after Wamu has a reliable commerce and communication foundation.
+Family and friends.
+Church and faith communities.
+School/alumni groups.
+Neighborhood communities.
+Professional communities.
+Buying groups.
+Business/supplier communities.
+Communities should have clear moderation, privacy, membership and reporting controls. Their purpose is not to force commerce into every conversation; commerce should appear when it is genuinely relevant.
+12. Delivery & Rider Network
+The rider system in the revised plan should become shared infrastructure for delivery first and passenger mobility later.
+Rider identity and document verification.
+Availability and service area.
+Simple explainable matching.
+Maps/routing abstraction.
+Backend fare calculation.
+Pickup/drop-off state machine.
+Live operational tracking.
+Proof of delivery.
+Ratings, disputes and safety escalation.
+13. Passenger Mobility — Later
+Passenger rides should reuse the rider network rather than be treated as a separate company inside the app.
+Pickup and destination.
+Fare estimate.
+Rider matching.
+Trip state machine.
+Navigation.
+Live tracking.
+Payment.
+Passenger/rider ratings.
+Share Trip, report problem and emergency assistance.
+14. Revenue Model
+Revenue stream
+Mechanism
+Recommended stage
+Business subscriptions
+Premium business tools and analytics
+After business value is proven
+Transaction/service fee
+Small fee on eligible completed commerce
+Early commerce stage
+Delivery/service margin
+Platform share of eligible delivery economics
+After delivery unit economics are proven
+Sponsored discovery
+Clearly labeled business promotion
+After audience scale
+Premium analytics
+Advanced business intelligence
+Later
+B2B service fee
+Wholesale/supplier transactions
+Later
+Partner/referral revenue
+Regulated third-party services where lawful
+Later and compliance-dependent
+Consumer access should generally remain free. Wamu should monetize the measurable value it creates for businesses and transactions rather than charging users simply for communication.
+15. Technical Architecture — Keep the Existing Direction
+The revised project plan's modular-monolith architecture is appropriate for the current stage and should be retained.
+Component
+Recommended choice
+Mobile
+Flutter, Android-first
+Backend
+Python + FastAPI
+Database
+PostgreSQL
+ORM/migrations
+SQLAlchemy 2.x + Alembic
+Validation
+Pydantic v2
+Cache/queue
+Redis
+Real-time
+WebSockets for relevant live features
+Media
+S3-compatible object storage + CDN
+Push
+Firebase Cloud Messaging
+Maps
+Google Maps behind a Location Service abstraction
+Payments
+Provider abstraction for MTN MoMo, Airtel Money and eligible card provider
+Deployment
+Docker, Nginx, CI/CD
+Monitoring
+Sentry + Prometheus/Grafana
+Architecture
+Modular monolith initially; no Kubernetes unless scale justifies it
+Do not prematurely split Wamu into microservices. Use bounded modules and clean interfaces so extraction is possible later.
+16. Recommended Backend Modules
+Identity & Access
+Users & Relationships
+Businesses
+Catalog
+Orders
+Payments
+Delivery
+Notifications
+Transactional Messaging
+Communities
+Content/Discovery
+Recommendations
+Mobility
+Analytics
+Trust & Safety
+Admin/Audit
+17. Database Evolution
+Now
+Later
+users, profiles, devices, sessions, otp_challenges
+friendships/follows
+businesses, business_profiles, categories
+communities, groups
+products, services
+business_videos, hashtags
+orders, order_items
+video views/watch events/recommendation events
+payments, payment_events
+conversations/messages/reactions
+rider_profiles, verifications, vehicles
+statuses/stories
+delivery_requests, delivery_events
+ride_requests, ride_trips, trip_locations
+reviews/ratings
+user interest profiles
+The schema should be designed so future modules can be added without rewriting the MVP's core transaction entities.
+18. Critical State Machines
+18.1 Order
+PENDING → CONFIRMED → PROCESSING → READY → OUT_FOR_DELIVERY → DELIVERED
+Cancellation: PENDING/CONFIRMED → CANCELLED. Refunds must be handled through explicit backend-controlled states and payment reconciliation.
+18.2 Delivery
+REQUESTED → RIDER_ASSIGNED → ACCEPTED → GOING_TO_PICKUP → PRODUCT_COLLECTED → IN_TRANSIT → DELIVERED
+18.3 Rider verification
+DRAFT → SUBMITTED → UNDER_REVIEW → APPROVED/REJECTED → RESUBMIT or SUSPENDED/EXPIRED
+Clients must never be trusted to declare payments successful, orders delivered or verification approved.
+19. Security, Privacy & Compliance
+Never store raw OTPs or log authentication secrets.
+Hash refresh tokens and secure sessions.
+Use strict authorization and role-based access.
+Keep verification documents private and access-controlled.
+Encrypt sensitive information appropriately.
+Use idempotency for payments and critical order operations.
+Verify payment webhooks cryptographically where supported.
+Maintain audit logs.
+Apply rate limiting and anti-abuse controls.
+Validate uploaded media.
+Minimize retained location history.
+Implement block, report, moderation and dispute workflows.
+Review Uganda's data protection, payments, consumer, tax, communications and transport requirements before launching regulated capabilities.
+20. Metrics — Change the North Star Slightly
+The existing project plan uses completed deliveries per day as the North Star. That is useful for the delivery MVP, but it is too narrow for the eventual Wamu platform.
+Stage
+Primary operating metric
+Concierge/MVP
+Completed deliveries per day + order completion rate
+Commerce growth
+Completed orders + repeat purchase rate
+Transactional chat
+Merchant conversations that lead to qualified enquiries/orders
+Discovery
+Product/business discovery events that lead to business actions
+Social expansion
+Retained active relationships/communities plus commerce activity
+Full platform
+Completed useful transactions and economic activity facilitated by Wamu
+Maintain the delivery metric during the delivery phase, but evolve the platform-level North Star toward useful economic activity rather than raw time spent in the app.
+21. Business Impact Metrics
+Active businesses.
+Business activation rate.
+Completed orders.
+Transaction value facilitated.
+Repeat purchase rate.
+Merchant retention.
+Customer retention.
+Delivery completion rate.
+Payment success rate.
+Rider utilization and completed deliveries.
+Revenue per active business.
+Business revenue attributable to Wamu where measurement is possible.
+Customer acquisition cost versus lifetime value.
+22. Go-to-Market
+Launch narrow and operationally dense.
+Kampala first.
+Food and groceries first.
+Recruit a controlled merchant cohort.
+Recruit and verify a controlled rider cohort.
+Offer free merchant onboarding during the pilot.
+Manually support early orders and disputes.
+Measure repeat transactions before expanding.
+Use referral and merchant-led customer acquisition.
+Expand categories only after the operational loop is reliable.
+23. What Not to Build Yet
+A general-purpose WhatsApp replacement.
+A general entertainment TikTok clone.
+Nationwide delivery from day one.
+Passenger mobility before delivery operations are mature.
+Complex machine-learning recommendations before sufficient data.
+A full financial-services product.
+Microservices/Kubernetes infrastructure without an operational need.
+24. Final Architecture of the Product
+Wamu Account
+Social identity and relationships
+Transactional identity
+Business capability
+Rider capability
+A single identity can progressively gain verified capabilities. This supports the long-term vision without forcing every user to become a merchant or rider.
+25. Final Product Map
+Pillar
+User reason to return
+Economic value
+Chat & relationships
+Talk to people
+Creates network and referrals
+Communities
+Belong and collaborate
+Creates trusted local networks
+Discovery
+Find useful businesses/products
+Creates demand
+Commerce
+Buy/sell conveniently
+Creates transactions
+Delivery
+Receive/send goods
+Creates logistics activity
+Mobility
+Move around the city
+Uses rider network more efficiently
+Business intelligence
+Understand and grow the business
+Improves productivity
+B2B
+Source and sell to businesses
+Supports supply-chain efficiency
+26. Final Recommendation
+The uploaded revised project should not be discarded. It should become the execution core of this unified Wamu plan.
+The strongest reconciliation is:
+Keep transaction-first MVP.
+Keep business/order chat in the MVP because it directly supports transactions.
+Delay general social chat until the commerce loop is proven.
+Keep communities as a later retention/network layer.
+Keep short video as a later commerce-focused discovery engine.
+Keep the rider network for delivery first and passenger mobility later.
+Keep the existing FastAPI/PostgreSQL/Redis/modular-monolith architecture.
+Use business data and transaction history to introduce advanced analytics and AI later.
+Expand into B2B and regional commerce only after domestic operations are reliable.
+This gives Wamu a coherent identity: not a collection of copied apps, but a platform where social relationships and local economic activity reinforce one another.
+27. One-Sentence Product Definition
+Wamu is a social-economic network that helps people connect and communicate, discover local businesses, transact safely, receive goods and services, and helps Ugandan enterprises grow.
+28. Immediate Engineering Priorities
+Freeze the MVP scope.
+Create the PostgreSQL schema and domain boundaries.
+Implement authentication and capability-based authorization.
+Implement merchant onboarding and catalog.
+Implement customer browsing.
+Implement transactional merchant chat.
+Implement order state machine.
+Integrate one payment provider first, then add the second.
+Implement delivery and rider state machines.
+Build admin verification/dispute tools.
+Instrument all major events for analytics.
+Run the concierge pilot before scaling the application.
+Use real pilot evidence to decide which social/community features move forward next.

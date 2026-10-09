@@ -1,0 +1,11 @@
+# Self-signed HTTPS for local/LAN demos (port 8443).
+# Trust the cert on the phone once, or accept the browser warning.
+
+{
+  auto_https off
+}
+
+:8443 {
+  tls /certs/wamu.pem /certs/wamu-key.pem
+  reverse_proxy api:8000
+}

@@ -1,0 +1,456 @@
+9/28/26, 1:35 PM                                    md2pdf - Markdown to PDF
+
+
+
+
+                                                                                Slide 1 of 10
+
+
+               Wamu Uganda
+               One app for discovery, chat, commerce, delivery, and rides.
+
+
+                        "Jumia built a warehouse. We are building a
+                                      neighborhood."
+
+               Presenter: [Your Name]
+
+               Date: 2026
+
+
+                   We are not another Jumia. We are the app that replaces the 4 apps
+                   Ugandans already use every day: WhatsApp, TikTok, SafeBoda, and their
+                   payment apps.
+
+
+
+
+https://md2pdf.netlify.app                                                                      1/16
+9/28/26, 1:35 PM                                  md2pdf - Markdown to PDF
+
+
+
+
+                                                                             Slide 2 of 10
+
+
+               The Problem
+               In Uganda, everyday commerce is scattered across four apps and a phone
+               call.
+
+
+
+
+                               WhatsApp
+
+
+
+
+                                  Chat
+                             with the business
+
+
+
+
+                                 TikTok
+
+
+
+
+                                Discover
+                             local businesses
+
+
+
+
+https://md2pdf.netlify.app                                                                   2/16
+9/28/26, 1:35 PM                                      md2pdf - Markdown to PDF
+                              SafeBoda
+
+
+
+
+                             Deliver / Ride
+                             boda network
+
+
+
+
+                                MoMo
+
+
+
+
+                                  Pay
+                             mobile money
+
+
+
+
+                      Businesses juggle 4 apps to reach customers.
+                      Customers juggle 4 apps to buy one lunch.
+                      No single app connects discovery, chat, payment, and delivery.
+                      Jumia exists — but it is a warehouse, not a neighborhood.
+
+
+
+
+https://md2pdf.netlify.app                                                             3/16
+9/28/26, 1:35 PM                                      md2pdf - Markdown to PDF
+
+
+
+
+                                                                                       Slide 3 of 10
+
+
+               The Solution
+               Wamu is Uganda's transaction layer. One account, one app, one loop.
+
+                   Discover      →      Chat   →    Buy   →        Pay      →    Deliver    →
+                   Review
+
+
+                   Jumia
+
+                         Product grid
+                         Anonymous seller
+                         Cart + checkout
+                         Warehouse shipping
+                         3–5 days delivery
+                         Cards
+
+
+
+                   Wamu
+
+                         Video feed
+                         Named, verified merchant
+                         Chat-based ordering
+                         Neighborhood rider
+                         Minutes, not days
+                         MoMo first
+
+
+
+
+https://md2pdf.netlify.app                                                                             4/16
+9/28/26, 1:35 PM                                    md2pdf - Markdown to PDF
+
+
+
+
+                                                                                Slide 4 of 10
+
+
+               The Product — Customer App
+
+
+                       ▶ Mama Grace cooking
+                              tilapia
+
+
+
+
+                    Mama Grace Kitchen ✓
+                    1.2 km · 4.9 ★
+
+                             Chat to Order
+
+                                 Follow
+
+
+
+
+                         Discover Feed
+
+
+
+                   <div class="phone"><div class="screen">
+                     <div class="label">Mama Grace Kitchen ✓</div>
+                     <div class="msg me">Do you have tilapia today?</div>
+                     <div class="msg">Yes! Fresh. 15k each.</div>
+                     <div class="msg me">2 for 25k?</div>
+                     <div class="msg">Yes, for you.</div>
+                     <div class="order-card">2× Tilapia — 25,000 UGX<br><span style="color
+                   </div><p style="text-align:center;font-size:0.8em;margin-top:6px;">Chat
+
+                   <div class="phone"><div class="screen">
+                     <div class="map"></div>
+                     <div class="rider"><div class="avatar">R</div><div>Ronald K. ✓<br><spa
+                     <div class="eta">ETA: 12 min</div>
+                   </div><p style="text-align:center;font-size:0.8em;margin-top:6px;">Live
+
+                   <div class="phone"><div class="screen">
+                     <div class="map"></div>
+                     <div class="rider"><div class="avatar">R</div><div>Ronald K. ✓<br><spa
+
+
+
+
+https://md2pdf.netlify.app                                                                      5/16
+9/28/26, 1:35 PM                                     md2pdf - Markdown to PDF
+                     <div class="eta">Kampala Road · 8,000 UGX</div>
+                   </div><p style="text-align:center;font-size:0.8em;margin-top:6px;">Wamu
+
+
+
+
+                   Same rider. Same app. Same account. Delivery and rides in one network.
+
+
+
+
+https://md2pdf.netlify.app                                                                   6/16
+9/28/26, 1:35 PM                                    md2pdf - Markdown to PDF
+
+
+
+
+                                                                                Slide 5 of 10
+
+
+               The Product — Merchant & Rider
+
+                    Mama Grace Kitchen
+                    Today: 14 orders · 210k UGX
+
+                              Post a Video
+
+                              View Orders
+
+                             Chat Customers
+
+
+
+
+                     Merchant Dashboard
+
+
+
+                   <div class="phone"><div class="screen">
+                     <div class="label">New Order</div>
+                     <div class="order-card">2× Tilapia — 25,000 UGX<br>To: Ntinda</div>
+                     <div class="btn">Accept</div>
+                     <div class="btn-outline">Reject</div>
+                   </div><p style="text-align:center;font-size:0.8em;margin-top:6px;">Incom
+
+                   <div class="phone"><div class="screen">
+                     <div class="label">Welcome, Ronald ✓</div>
+                     <div class="sub">Available for Delivery: ON</div>
+                     <div class="sub">Available for Rides: ON</div>
+                     <div class="sub">Today: 8 deliveries · 3 rides</div>
+                     <div class="sub">Earnings: 42,000 UGX</div>
+                   </div><p style="text-align:center;font-size:0.8em;margin-top:6px;">Rider
+
+                   <div class="phone"><div class="screen">
+                     <div class="label">Ride Request</div>
+                     <div class="order-card">Pickup: Sarah (1.5 km)<br>Dropoff: Kampala Rd<
+
+
+
+
+https://md2pdf.netlify.app                                                                      7/16
+9/28/26, 1:35 PM                                      md2pdf - Markdown to PDF
+                     <div class="btn">Accept</div>
+                   </div><p style="text-align:center;font-size:0.8em;margin-top:6px;">Incom
+
+
+
+
+                   One rider network. Two service types. Higher rider earnings. Better
+                   customer experience.
+
+
+
+
+https://md2pdf.netlify.app                                                                    8/16
+9/28/26, 1:35 PM                                    md2pdf - Markdown to PDF
+
+
+
+
+                                                                               Slide 6 of 10
+
+
+               Why Now
+                      Smartphone adoption is rising across Uganda.
+                      Mobile money is mainstream — MTN MoMo and Airtel Money
+                      have millions of users.
+                      Boda riders are everywhere — the delivery and ride network
+                      already exists.
+                      Social commerce is exploding — businesses already sell on
+                      WhatsApp and TikTok.
+                      No one has connected it all. Jumia is a warehouse. SafeBoda is
+                      rides. TikTok is entertainment. WhatsApp is chat. Nobody owns the
+                      loop.
+
+
+                   The infrastructure exists. The behavior exists. The
+                                      app does not.
+
+
+
+
+https://md2pdf.netlify.app                                                                     9/16
+9/28/26, 1:35 PM                                           md2pdf - Markdown to PDF
+
+
+
+
+                                                                                      Slide 7 of 10
+
+
+               Traction — Concierge MVP
+               Before writing a single line of code, we ran a manual concierge MVP in
+               Kampala.
+
+                   Metric                  Result
+
+                   Merchants onboarded     [Your number]
+
+                   Riders engaged          [Your number]
+
+                   Orders processed        [Your number]
+
+                   Repeat customer rate    [Your number]%
+
+                   Average order value     [Your number] UGX
+
+                   Average delivery time   [Your number] min
+
+
+                    These numbers are from real customers, real merchants, and real riders
+                    — not projections.
+
+
+               Replace bracketed values with your actual concierge MVP results.
+
+
+
+
+https://md2pdf.netlify.app                                                                            10/16
+9/28/26, 1:35 PM                                    md2pdf - Markdown to PDF
+
+
+
+
+                                                                                 Slide 8 of 10
+
+
+               The Demo
+               We are building a working demo that proves the full loop end to end.
+
+
+
+
+                              1. Discover
+
+
+
+
+                                2. Chat
+
+
+
+
+                             3. Pay (MoMo)
+
+
+https://md2pdf.netlify.app                                                                       11/16
+9/28/26, 1:35 PM                                      md2pdf - Markdown to PDF
+
+
+
+
+                             4. Deliver
+
+
+
+
+                              5. Ride
+
+
+
+
+                   Built in 6 weeks by a solo developer with 4 years of experience.
+                   Stack: Flutter · Python FastAPI · PostgreSQL · Redis · Google Maps ·
+
+https://md2pdf.netlify.app                                                                12/16
+9/28/26, 1:35 PM                                 md2pdf - Markdown to PDF
+
+                   MTN MoMo (mocked for demo).
+
+
+
+
+https://md2pdf.netlify.app                                                  13/16
+9/28/26, 1:35 PM                                        md2pdf - Markdown to PDF
+
+
+
+
+                                                                                   Slide 9 of 10
+
+
+               The Ask
+               We are raising [Amount] to:
+
+                   1. Complete the production build of the customer, merchant, and rider
+                      apps.
+                   2. Integrate real MTN MoMo and Airtel Money payments.
+                   3. Launch in one Kampala neighborhood with 20 merchants and 50 riders.
+                   4. Prove the loop: 100 deliveries/day, 30% repeat rate.
+                   5. Expand to 5 neighborhoods within 12 months.
+
+                   Use of funds: 60% engineering · 20% operations · 15% marketing · 5%
+                   legal & compliance.
+
+
+               Adjust percentages and amounts to your plan.
+
+
+
+
+https://md2pdf.netlify.app                                                                         14/16
+9/28/26, 1:35 PM                                   md2pdf - Markdown to PDF
+
+
+
+
+                                                                              Slide 10 of 10
+
+
+               Vision
+
+                    "One app. One account. One neighborhood at a
+                                                time."
+
+               Wamu is not another Jumia. It is not another WhatsApp. It is not another
+               SafeBoda.
+
+               Wamu is the app that makes them all unnecessary inside one
+               connected ecosystem.
+
+                   Kampala   →    Uganda    →     East Africa
+
+
+               Build the loop. Win the city. Scale the ecosystem.
+
+
+
+               Contact: [Your Name] · [Email] · [Phone]
+
+
+
+
+https://md2pdf.netlify.app                                                                     15/16
+9/28/26, 1:35 PM                                        md2pdf - Markdown to PDF
+
+          Wamu Uganda — Pitch Deck v1.0 · Replace bracketed placeholders with real data before presenting.
+
+
+
+
+https://md2pdf.netlify.app                                                                                   16/16
+

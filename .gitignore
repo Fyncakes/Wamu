@@ -1,0 +1,69 @@
+# Secrets / local env (keep *.example)
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/.env
+**/.env.local
+**/.env.staging
+**/.env.production
+!**/.env.example
+!**/.env.*.example
+infrastructure/.env.staging
+
+# Python
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / Next
+node_modules/
+.next/
+out/
+
+# Flutter / Dart
+.dart_tool/
+build/
+**/build/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+wamu-mobile/.flutter-plugins-dependencies
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+coverage/
+*.log
+
+# Demo runtime / large binaries (not for GitHub)
+dist/
+.tools/
+wamu-backend/media_uploads/
+infrastructure/certs/*.pem
+infrastructure/certs/*.key
+
+# Local DB / SQLite
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Large local demo / recording assets (use seed scripts + external storage)
+video-demo/
+screen-videos/
+analysis /
+**/*.mp4
+specs/_wa_frames/
+!**/.gitkeep
+
+# Cursor / agent
+.cursor/
+**/agent-transcripts/
+.github/workflows/

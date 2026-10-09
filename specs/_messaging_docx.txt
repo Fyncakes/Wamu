@@ -1,0 +1,417 @@
+WAMU — UGANDA-FIRST MESSAGING PLATFORM
+Product Requirements & Technical BlueprintVersion 1.0 • Chat-first strategy • Android-first
+1. Executive Summary
+Wamu is a Uganda-first communication platform designed to provide the core everyday messaging experience people expect from modern messaging apps while adding features that make the service particularly useful for Ugandan users and communities.
+The first release should NOT attempt to launch the entire Wamu super-app. The product should first win trust and daily usage through excellent private messaging, media sharing, voice/video calling, groups, communities, status, contacts and notifications. Business, marketplace, payments, delivery and AI capabilities can then be layered on top of the communication network.
+2. Product Vision
+Positioning: “Wamu — Uganda’s digital communication home.”
+Long-term loop: Connect → Chat → Share → Discover → Do more.
+Phone-number-based onboarding with OTP verification.
+Fast private and group messaging.
+Photo, video, audio/voice-note and document sharing.
+Voice and video calls.
+Status/stories.
+Groups and communities.
+Strong privacy and security.
+Low-data and unreliable-network resilience.
+Uganda-focused discovery and community features.
+Future expansion into business messaging, commerce, payments and AI.
+3. Product Strategy
+The goal should not be to copy WhatsApp's source code, branding, proprietary assets or private implementation. Wamu should independently implement a comparable category feature set with its own design, identity, architecture and user experience.
+WhatsApp's current feature set demonstrates why privacy, media messaging, groups, communities, status and calling are foundational expectations. Its documentation states that personal messages, calls, voice messages, photos, videos and documents are protected by end-to-end encryption. Wamu should treat comparable privacy as a core engineering requirement rather than an optional later feature.
+4. Target MVP
+4.1 Account & Identity
+Register with Uganda phone number (+256) using OTP.
+Login/re-login securely.
+Profile name, username, photo and About text.
+Optional email for account recovery/notifications.
+Device registration and session management.
+Logout from current device and revoke other sessions.
+Block/unblock users.
+Report users, messages and groups.
+4.2 One-to-One Chat
+Text messages.
+Emoji and Unicode support.
+Reply/quote messages.
+Message reactions.
+Edit sent messages.
+Delete for me / delete for everyone where permitted.
+Forward messages.
+Copy text.
+Pin important messages.
+Search within a conversation.
+Typing indicator.
+Online/last-seen controls.
+Sent/delivered/read states.
+Disappearing messages.
+Chat mute.
+Chat archive.
+Chat lock/app lock as a later security feature.
+4.3 Photo Sharing
+Send one or multiple photos.
+Camera capture directly from chat.
+Gallery selection.
+Preview before sending.
+Compression optimized for Uganda's mobile-data conditions.
+Original-quality option for users who choose it.
+Photo captions.
+Download/save controls.
+Forward photos.
+Thumbnail generation.
+Progress indicator and resumable upload.
+4.4 Video Sharing
+Send recorded videos from gallery.
+Record video from chat.
+Preview before sending.
+Automatic thumbnail.
+Adaptive compression/transcoding.
+Progressive upload/download.
+Resume interrupted transfers.
+Captions.
+Mute/unmute playback.
+Forward and delete controls.
+Configurable maximum video size and duration.
+4.5 Audio & Voice Notes
+Record voice notes in chat.
+Tap-and-hold and lock-to-record interaction.
+Cancel recording.
+Pause/resume recording.
+Waveform display.
+Playback speed controls.
+Voice-note duration.
+Background playback.
+Audio file sharing.
+Server-side media metadata without exposing message contents.
+Optional audio compression for low-data users.
+4.6 Documents & Files
+PDF sharing.
+Images and common office documents.
+File name and size display.
+Upload/download progress.
+Resumable transfers.
+File size limits.
+Malware/file-type validation on the server where appropriate.
+Do not execute uploaded files on backend infrastructure.
+4.7 Voice & Video Calling
+One-to-one voice calls.
+One-to-one video calls.
+Call history.
+Incoming/outgoing/missed call states.
+Mute microphone.
+Camera on/off.
+Speaker/earpiece selection.
+Network-quality indicator.
+Later: group calls.
+Later: screen sharing.
+Use WebRTC for real-time media transport. The backend should provide signaling and authentication while media should use secure real-time transport. TURN infrastructure will be necessary because many users will be behind carrier NATs.
+4.8 Status / Stories
+Photo status.
+Video status.
+Text status.
+Optional voice/audio status.
+24-hour expiry.
+Audience controls.
+View counts where appropriate.
+Status replies open a chat.
+Mute/unmute status updates.
+Report status.
+4.9 Groups
+Create group.
+Group photo/name/description.
+Invite members.
+Admin and moderator roles.
+Join links.
+Member approval.
+Admin-only announcements.
+Pinned messages.
+Polls.
+Media/files.
+Group message search.
+Mute notifications.
+Group permissions.
+Remove/ban members.
+Report group.
+4.10 Communities
+Community contains multiple related groups.
+Community announcement channel.
+Community administrators.
+Local community discovery.
+Topic-based groups.
+Community rules and moderation.
+Examples: Kampala Business, Mbarara Students, Uganda Developers, Church Communities.
+5. Uganda-First Features
+Excellent performance on budget Android phones.
+Data-saving mode.
+Media compression tuned for mobile networks.
+Resumable uploads after connection loss.
+Offline message queue.
+Clear connection status.
+Phone-number-first identity.
+Uganda country-code defaults during onboarding.
+Local language-friendly Unicode and search.
+Community discovery by district/city as an optional feature.
+Business profiles later.
+Mobile-money/payment integrations later, subject to proper provider and legal requirements.
+Local events, jobs, services and marketplace discovery later.
+6. Main Mobile Navigation
+Recommended initial navigation: Chats | Communities | Status | Calls | Settings.
+A Discover tab can be introduced once there is enough local content and a moderation system to support it.
+7. Backend Architecture
+Recommended stack:
+Flutter — Android-first mobile application.
+Python + FastAPI — REST/API backend.
+PostgreSQL — users, conversations, messages, groups and metadata.
+Redis — rate limiting, presence, temporary state and queues.
+WebSockets — real-time chat events and signaling.
+WebRTC — voice/video calls.
+S3-compatible object storage — encrypted media/file objects.
+CDN — efficient media delivery.
+Background workers — media processing, thumbnails, notifications and cleanup.
+Firebase Cloud Messaging — Android push notifications.
+Docker — reproducible deployment.
+Nginx/load balancer — production ingress.
+Sentry + metrics/logging — monitoring.
+8. Proposed Database Core
+users
+user_profiles
+devices
+sessions
+contacts
+blocked_users
+conversations
+conversation_members
+messages
+message_reactions
+message_receipts
+message_attachments
+media_objects
+groups
+group_members
+group_invites
+communities
+community_members
+statuses
+status_views
+calls
+call_participants
+notifications
+reports
+audit_logs
+9. Message Model
+A message should contain metadata such as message ID, conversation ID, sender ID, message type, timestamps, reply-to ID, forwarding metadata and delivery/read state. For encrypted private conversations, the server should store ciphertext and routing metadata rather than plaintext message content.
+10. Media Architecture
+Recommended flow:
+Client requests an upload authorization/token.
+Backend validates authenticated user and intended conversation.
+Client uploads encrypted media to object storage.
+Backend stores a media-object record and encrypted message metadata.
+Recipient receives a real-time message event.
+Recipient downloads the media securely using an authorized mechanism.
+Client decrypts and displays/plays the media.
+Background workers create safe thumbnails/transcoding derivatives where the security model permits.
+Do not store large media blobs directly inside PostgreSQL. Store media in object storage and keep metadata/reference records in PostgreSQL.
+11. Security & Privacy
+End-to-end encryption should be designed before production launch for private chats and calls.
+Use a mature, independently reviewed cryptographic protocol/library rather than inventing encryption.
+Never invent a custom encryption algorithm.
+Never log plaintext messages, OTPs, access tokens or private media keys.
+Hash refresh tokens before database storage.
+Rate-limit OTP requests, login attempts and suspicious activity.
+Use short-lived access tokens and revocable sessions.
+Encrypt data in transit with TLS.
+Protect object storage with private buckets and controlled access.
+Use server-side authorization for every conversation/group operation.
+Provide block/report tools.
+Build abuse/spam controls from the beginning.
+Maintain audit trails for administrative/security actions.
+WhatsApp documents end-to-end encryption for personal messages, calls, voice messages, photos, videos, documents and related private content. Wamu should set an equally serious privacy target for personal communication. See WhatsApp's official privacy and encryption documentation for the feature baseline.
+12. Real-Time Messaging Flow
+Flutter → authenticated WebSocket → message service → authorization → persist encrypted message metadata/ciphertext → publish event → recipient WebSocket → delivery receipt → read receipt → push notification if recipient is offline.
+13. Offline & Poor-Network Design
+Local encrypted message database/cache on device.
+Outbox queue for unsent messages.
+Automatic retry with exponential backoff.
+Idempotent message IDs to prevent duplicates.
+Resumable media transfers.
+Small thumbnails before full media.
+Low-data mode.
+Background synchronization.
+Push notification fallback.
+Clear pending/sent/delivered/read UI states.
+14. Push Notifications
+New message.
+Missed call.
+Group mention.
+Group/community announcement.
+Status reply.
+Security/session event.
+Notification preferences per chat/group.
+Do not include sensitive plaintext message content in push payloads where privacy would be compromised.
+15. Moderation & Safety
+Block user.
+Report user.
+Report message.
+Report group/community.
+Spam detection.
+Rate limits.
+Abuse escalation workflow.
+Admin moderation dashboard.
+Evidence preservation according to applicable law and documented policy.
+Transparent community rules.
+Account suspension/appeal workflow.
+16. Admin Dashboard
+User search and account status.
+Reports queue.
+Group/community moderation.
+Spam/security alerts.
+Session/security events.
+Basic platform metrics.
+Media/storage monitoring.
+Notification monitoring.
+Admin role management.
+Immutable audit log for sensitive actions.
+17. API Surface — Initial
+POST /api/v1/auth/request-otp
+POST /api/v1/auth/verify-otp
+POST /api/v1/auth/refresh
+POST /api/v1/auth/logout
+GET  /api/v1/auth/me
+GET  /api/v1/users/{id}
+POST /api/v1/conversations
+GET  /api/v1/conversations
+GET  /api/v1/conversations/{id}/messages
+POST /api/v1/media/upload-intent
+POST /api/v1/messages
+PATCH /api/v1/messages/{id}
+DELETE /api/v1/messages/{id}
+POST /api/v1/messages/{id}/read
+POST /api/v1/groups
+GET  /api/v1/groups/{id}
+POST /api/v1/groups/{id}/members
+POST /api/v1/status
+GET  /api/v1/status
+POST /api/v1/calls
+18. WebSocket Events
+message.new
+message.delivered
+message.read
+message.edited
+message.deleted
+typing.started
+typing.stopped
+presence.updated
+call.incoming
+call.accepted
+call.rejected
+call.ended
+group.member.updated
+notification.new
+19. Flutter Screens
+Splash
+Phone number
+OTP verification
+Profile setup
+Chats
+New chat/contact picker
+Conversation
+Attachment picker
+Camera
+Photo/video preview
+Audio recording
+Calls
+Incoming call
+Active voice call
+Active video call
+Status
+Status viewer
+Create status
+Communities
+Group details
+Group creation
+User profile
+Settings
+Privacy
+Devices/sessions
+Blocked users
+Reports/help
+20. Development Phases
+Phase 1 — Foundation: FastAPI, PostgreSQL, Redis, migrations, authentication, users, devices, sessions, CI/CD, health checks.
+Phase 2 — Messaging: Conversations, members, text messages, WebSockets, receipts, typing, presence, push notifications.
+Phase 3 — Media: Photo, video, audio, voice notes, documents, object storage, thumbnails, compression, resumable uploads.
+Phase 4 — Groups & Communities: Groups, roles, invites, announcements, polls, communities, moderation.
+Phase 5 — Calls: WebRTC signaling, one-to-one voice/video calls, call history, TURN.
+Phase 6 — Privacy & Security: E2EE implementation, device/session security, abuse controls, encryption verification, audits.
+Phase 7 — Beta: Performance testing, low-network testing, crash monitoring, closed Uganda beta.
+Phase 8 — Public Launch: Play Store release, onboarding, referral system, support, monitoring and controlled scaling.
+Phase 9 — Wamu Expansion: Business profiles, local discovery, marketplace, payments, events and AI.
+21. Performance Targets
+Fast chat screen startup on budget Android devices.
+Message send should feel immediate even when network quality is poor.
+Messages should be queued locally when temporarily offline.
+Media should adapt to connection quality and user-selected data mode.
+Backend should be horizontally scalable.
+WebSocket connections should be monitored and recover automatically.
+No single server should be a permanent state dependency.
+22. Testing Requirements
+Unit tests for services and repositories.
+API integration tests.
+WebSocket tests.
+Authentication/security tests.
+Media upload tests.
+Message ordering and duplication tests.
+Offline/retry tests.
+Load tests for messaging and WebSockets.
+Android device tests across low/mid/high-range devices.
+Network tests using slow/intermittent connections.
+Security review before public launch.
+23. Non-Functional Requirements
+Scalable.
+Secure.
+Observable.
+Recoverable.
+Privacy-preserving.
+Mobile-data efficient.
+Resilient to intermittent connectivity.
+Backward-compatible API versioning.
+Automated database backups and restore testing.
+No secrets committed to source control.
+24. Suggested Repository
+wamu/├── wamu-mobile/                 # Flutter├── wamu-backend/                # FastAPI├── wamu-workers/                # background jobs├── wamu-infrastructure/         # Docker, deployment, monitoring├── docs/                         # architecture and product docs└── README.md
+25. Important Engineering Decision
+Do not build every feature at once. Build a vertical slice first: register → find/contact a user → open chat → send text → receive text → delivery/read receipts → push notification. Then add photo/video/audio/files, followed by groups, status and calls.
+26. Definition of Done for First Public Beta
+A new Ugandan user can register with a phone number.
+The user can create a profile.
+Two users can find each other and start a private chat.
+Text messages work in real time.
+Messages survive temporary network loss.
+Photos can be sent reliably.
+Videos can be sent reliably.
+Voice notes can be recorded and played.
+Audio files can be shared.
+Documents can be shared.
+Push notifications work.
+Users can create groups.
+Users can post status updates.
+Users can make one-to-one voice/video calls.
+Users can block/report accounts.
+Private communication has the intended end-to-end encryption architecture.
+Monitoring, backups and basic incident procedures are operational.
+27. Long-Term Wamu Roadmap
+After the messaging network has meaningful adoption, Wamu can progressively add:
+Business accounts and verified businesses.
+Business catalogues.
+Local business discovery.
+Marketplace.
+Orders and delivery.
+Payments/mobile-money integrations.
+Events.
+Local news/discovery.
+AI assistant.
+Developer/mini-app platform.
+28. Final Direction to the Development Team
+Build Wamu as a serious communication platform first. The objective is not merely to make another chat UI; it is to build a reliable communication network capable of handling private messages, groups, media, calls, communities and local discovery at scale.
+The application must be designed for Uganda's real-world constraints: Android-first usage, mobile data costs, variable network quality, budget devices, phone-number identity and strong community usage. Privacy and security must be designed into the architecture from the beginning.
+Once Wamu becomes a trusted communication layer, the same identity, social graph, groups and business relationships can power the broader Wamu ecosystem.
+29. Reference Baseline
+The product team should use current messaging-platform capabilities as a feature benchmark, but implement Wamu independently. WhatsApp's official documentation currently describes end-to-end encrypted personal messages/calls, voice messages, photos, videos, documents, groups, communities, status and related privacy controls. Wamu should aim for comparable quality and privacy while maintaining its own product identity and architecture.
