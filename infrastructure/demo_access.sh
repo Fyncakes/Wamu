@@ -38,39 +38,45 @@ demo_write_access() {
   echo "$LAN" >"$DIST/LAN_IP.txt"
 
   cat >"$DIST/ACCESS.md" <<EOF
-# Wamu demo access
+# Wamu — share access
 
-Keep the **PC awake**. Quick tunnels change URL when restarted — prefer Wi‑Fi when on the same network.
+Keep the **PC awake** while friends are testing. Quick tunnels change URL when restarted — run \`./start_wamu.sh\` again and share the new link.
 
 ## Public (any network / mobile data)
 
-- **App:** ${URL}
-- **Connect (APK paste):** ${URL}/connect
+- **App (Chrome):** ${URL}
+- **Connect (APK):** ${URL}/connect
+- **APK download:** ${URL}/media-files/wamu-phone.apk
 - **Health:** ${URL}/api/v1/health
 - **OTP:** \`123456\`
 
-If Chrome shows Error **1033**, the old tunnel died — open the new URL from this file (or ask for a restart).
+If Chrome shows Error **1033**, the tunnel died — on the PC run \`./start_wamu.sh\` and share the new URL.
 
-## Wi‑Fi fallback (same LAN as PC)
+## Wi‑Fi (same network as PC)
 
 - **App:** http://${LAN}:8000
-- **APK download:** http://${LAN}:8088/wamu-phone.apk
-- **Connect page:** http://${LAN}:8000/connect
+- **APK:** http://${LAN}:8088/wamu-phone.apk
+- **Connect:** http://${LAN}:8000/connect
 
 ## Native APK
 
-1. Install \`wamu-phone.apk\` (USB, or Wi‑Fi link above).
-2. Open app → paste **${URL}/connect** (or the Wi‑Fi connect URL).
+1. Install \`wamu-phone.apk\` (USB from \`dist/wamu-phone.apk\`, or download link above).
+2. Open app → set server via **${URL}/connect** (or You → Wamu server).
+
+## One control on this PC
+
+\`\`\`bash
+./start_wamu.sh          # start
+./stop_wamu.sh           # stop
+./start_wamu.sh --apk    # start + rebuild APK
+\`\`\`
 
 ## Fixed public URL (optional)
 
-One-time Cloudflare login + named tunnel:
-
 \`\`\`bash
-./infrastructure/setup_named_tunnel.sh
+./infrastructure/setup_named_tunnel.sh --hostname wamu.yourdomain.com
+./start_wamu.sh
 \`\`\`
-
-Then \`./infrastructure/phone_demo_up.sh\` will reuse that hostname.
 
 ## Build id
 
