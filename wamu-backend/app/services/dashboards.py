@@ -375,6 +375,22 @@ async def rider_earnings(db: AsyncSession, user: User) -> dict:
         )
     ).all()
     total = sum((Decimal(str(d.fee or 0)) for d in delivered), Decimal("0"))
+    from app.models.payout import PayoutStatus, RiderPayout
+
+    settled = await db.scalar(
+        select(func.coalesce(func.sum(RiderPayout.amount), 0)).where(
+            RiderPayout.rider_id == rider.id,
+            RiderPayout.status == PayoutStatus.SUCCESS.value,
+        )
+    )
+    pending = await db.scalar(
+        select(func.coalesce(func.sum(RiderPayout.amount), 0)).where(
+            RiderPayout.rider_id == rider.id,
+            RiderPayout.status.in_(
+                [PayoutStatus.PENDING.value, PayoutStatus.PROCESSING.value]
+            ),
+        )
+    )
     return {
         "rider_id": str(rider.id),
         "display_name": rider.display_name,
@@ -382,6 +398,10 @@ async def rider_earnings(db: AsyncSession, user: User) -> dict:
         "delivery_count": rider.delivery_count,
         "completed_deliveries": len(delivered),
         "earnings_ugx": float(total),
+        "settled_ugx": float(settled or 0),
+        "pending_payout_ugx": float(pending or 0),
+        "payout_phone": rider.payout_phone,
+        "payout_provider": rider.payout_provider,
         "available_delivery": rider.available_delivery,
         "available_rides": rider.available_rides,
         "vehicle_type": rider.vehicle_type,

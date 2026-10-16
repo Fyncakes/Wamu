@@ -151,8 +151,22 @@ class _RiderDashboardScreenState extends ConsumerState<RiderDashboardScreen> {
                 title: const Text('Earnings'),
                 subtitle: Text(
                   '${formatUgx((d['earnings_ugx'] as num?)?.toDouble() ?? 0)} · '
-                  '${d['completed_deliveries'] ?? 0} completed',
+                  '${d['completed_deliveries'] ?? 0} completed'
+                  '${d['pending_payout_ugx'] != null ? ' · pending ${formatUgx((d['pending_payout_ugx'] as num).toDouble())}' : ''}',
                 ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/rider/payouts'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: AppTheme.accentGreen),
+                title: const Text('Payout destination'),
+                subtitle: Text(
+                  d['payout_phone']?.toString().isNotEmpty == true
+                      ? '${d['payout_phone']} · ${d['payout_provider'] ?? 'MTN'}'
+                      : 'Set MoMo / Airtel number for delivery fees',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/rider/payouts'),
               ),
               ListTile(
                 leading: const Icon(Icons.star_outline, color: AppTheme.accentGreen),

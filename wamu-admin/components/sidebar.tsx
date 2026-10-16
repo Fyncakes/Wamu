@@ -12,6 +12,7 @@ const navItems = [
   { href: "/orders", label: "Orders", icon: "▤" },
   { href: "/payments", label: "Payments", icon: "◈" },
   { href: "/payouts", label: "Payouts", icon: "⇢" },
+  { href: "/reconciliation", label: "Reconciliation", icon: "⇄" },
   { href: "/deliveries", label: "Deliveries", icon: "📦" },
   { href: "/categories", label: "Categories", icon: "▦" },
   { href: "/reports", label: "Reports", icon: "⚑" },

@@ -101,7 +101,8 @@ fi
 
 if [[ -z "$URL" && -x "$CF" ]]; then
   : >"$LOG_DIR/tunnel.log"
-  nohup "$CF" tunnel --url http://127.0.0.1:8000 --no-autoupdate >"$LOG_DIR/tunnel.log" 2>&1 &
+  # http2 is more stable than quic for quick tunnels on some networks
+  nohup "$CF" tunnel --protocol http2 --url http://127.0.0.1:8000 --no-autoupdate >"$LOG_DIR/tunnel.log" 2>&1 &
   echo $! >"$PID_DIR/tunnel.pid"
   for _ in $(seq 1 60); do
     CAND=$(grep -aoE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG_DIR/tunnel.log" 2>/dev/null \
@@ -119,6 +120,11 @@ if [[ -z "$URL" ]]; then
   echo "[wamu] no public tunnel — Wi‑Fi only: $URL"
 fi
 
+# Pin URL files before watchdog so it does not race and rotate the tunnel.
+demo_write_access "$URL"
+echo "$URL" >"$LOG_DIR/tunnel_url.txt"
+demo_write_share "$URL"
+
 if [[ "$URL" == https://* ]]; then
   if [[ -f "$PID_DIR/watchdog.pid" ]]; then
     kill "$(cat "$PID_DIR/watchdog.pid")" 2>/dev/null || true
@@ -126,32 +132,6 @@ if [[ "$URL" == https://* ]]; then
   nohup "$ROOT/infrastructure/phone_demo_watchdog.sh" >"$LOG_DIR/watchdog.log" 2>&1 &
   echo $! >"$PID_DIR/watchdog.pid"
 fi
-
-demo_write_access "$URL"
-echo "$URL" >"$LOG_DIR/tunnel_url.txt"
-
-# Friend-facing share card
-LAN=$(demo_detect_lan_ip)
-APK_SIZE=""
-[[ -f "$DIST/wamu-phone.apk" ]] && APK_SIZE=$(du -h "$DIST/wamu-phone.apk" | awk '{print $1}')
-
-cat >"$DIST/SHARE.txt" <<EOF
-Wamu is running on this PC.
-
-PUBLIC LINK (any network / mobile data):
-  App (Chrome):     $URL
-  Connect (APK):    $URL/connect
-  APK download:     $URL/media-files/wamu-phone.apk
-
-WI-FI (same network as this PC):
-  App:              http://${LAN}:8000
-  APK:              http://${LAN}:8088/wamu-phone.apk
-  USB copy:         $DIST/wamu-phone.apk ${APK_SIZE:+($APK_SIZE)}
-
-LOGIN: use any phone number + OTP 123456 (mock)
-
-Keep this PC awake. Stop with: ./stop_wamu.sh
-EOF
 
 echo
 echo "============================================"

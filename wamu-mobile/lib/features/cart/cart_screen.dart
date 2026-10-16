@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/network/api_error.dart';
 import '../../shared/models/business_model.dart';
 import '../../shared/utils/ugx_formatter.dart';
+import '../../shared/widgets/momo_otp_dialog.dart';
 import '../../shared/widgets/wamu_network_image.dart';
 import '../auth/auth_provider.dart';
 import '../cart/cart_provider.dart';
@@ -129,6 +130,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           idempotencyKey: cart.newIdempotencyKey(),
           provider: _provider,
           phone: phone,
+          onOtpRequired: momoOtpPrompt(context),
           onStatus: (s) {
             if (!mounted) return;
             setState(() {
@@ -138,7 +140,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       : 'Payment confirmed')
                   : s == 'FAILED'
                       ? 'Payment failed'
-                      : 'Confirming $_provider payment… ($s)';
+                      : s == 'OTP'
+                          ? 'Enter $_provider MoMo code…'
+                          : 'Confirming $_provider payment… ($s)';
             });
           },
         );

@@ -201,6 +201,14 @@ class _PayoutSettingsScreenState extends ConsumerState<PayoutSettingsScreen> {
                         final fee = p['platform_fee'];
                         final status = p['status']?.toString() ?? '—';
                         final created = p['created_at']?.toString();
+                        final statusLabel = switch (status) {
+                          'PENDING' => 'Queued',
+                          'PROCESSING' => 'Sending…',
+                          'SUCCESS' => 'Sent',
+                          'FAILED' => 'Failed',
+                          'REVERSED' => 'Reversed',
+                          _ => status,
+                        };
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
@@ -210,7 +218,7 @@ class _PayoutSettingsScreenState extends ConsumerState<PayoutSettingsScreen> {
                           ),
                           subtitle: Text(
                             [
-                              status,
+                              statusLabel,
                               if (fee != null)
                                 'fee ${formatUgx(double.tryParse('$fee') ?? 0)}',
                               if (created != null) created.split('T').first,

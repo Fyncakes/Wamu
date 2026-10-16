@@ -101,11 +101,14 @@ After collection **SUCCESS**, Wamu instructs MoMo **Disbursement** to the busine
 | Trigger | payment webhook / reconcile / mock auto-success |
 | Owner API | `GET /api/v1/businesses/{id}/payouts` |
 | Admin | `GET /admin/payouts`, `POST /admin/payouts/reconcile`, `POST /admin/payouts/{id}/retry` |
+| Queue | `GET /admin/finance/payout-queue`, `POST .../execute`, `POST .../{id}/execute` |
 | Celery | `wamu.reconcile_payouts` every 5m + nightly 02:30 |
 
-Disbursement callbacks reuse `POST /payments/webhooks/{provider}` — if collection reference is unknown, lookup tries `MerchantPayout`.
+Disbursement callbacks reuse `POST /payments/webhooks/{provider}` — if collection reference is unknown, lookup tries `MerchantPayout`. Payload `kind=disbursement` routes straight to payout processing.
 
 Set `PLATFORM_FEE_BPS=250` for a 2.5% cut. Fee is never credited to a Wamu user wallet.
+
+**Go-live:** see `documentation/PHASE_C_GO_LIVE.md`. Watch `ready_for_live_disbursement` on `/health/rails`.
 
 ## Admin visibility
 

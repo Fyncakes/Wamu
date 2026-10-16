@@ -50,9 +50,16 @@ def rails_readiness(settings: Settings | None = None) -> dict[str, Any]:
 
     Safe to expose on /health/rails — no secret values.
     """
+    from app.integrations.payments.disbursement import (
+        airtel_disbursement_configured,
+        mtn_disbursement_configured,
+    )
+
     s = settings or get_settings()
     mtn = _set(s.mtn_subscription_key) and _set(s.mtn_api_user) and _set(s.mtn_api_key)
     airtel = _set(s.airtel_client_id) and _set(s.airtel_client_secret)
+    mtn_disb = mtn_disbursement_configured(s)
+    airtel_disb = airtel_disbursement_configured(s)
     sms = _set(s.africastalking_username) and _set(s.africastalking_api_key)
     turn = _set(s.turn_urls) and _set(s.turn_username) and _set(s.turn_credential)
     ice = _ice_servers_from(s)
@@ -62,15 +69,34 @@ def rails_readiness(settings: Settings | None = None) -> dict[str, Any]:
         for entry in ice
     )
     turn_local = _turn_urls_look_local(s.turn_urls)
+    api_base = (s.public_api_base or "").rstrip("/")
+    callback_reachable = bool(api_base) and not any(
+        x in api_base for x in ("127.0.0.1", "localhost", "0.0.0.0")
+    )
+    webhook_ok = _set(s.payment_webhook_secret) and s.payment_webhook_secret not in {
+        "",
+        "dev-webhook-secret-change-me",
+    }
 
     return {
         "environment": s.environment,
         "payment_mock_auto_success": s.payment_mock_auto_success,
         "platform_fee_bps": s.platform_fee_bps,
+        "payout_auto_execute": s.payout_auto_execute,
+        "provider_fee_bps": s.provider_fee_bps,
+        "public_api_base_set": bool(api_base),
+        "disbursement_callback_reachable": callback_reachable,
         "mtn_collections_configured": mtn,
+        "mtn_disbursement_configured": mtn_disb,
+        "mtn_disbursement_uses_dedicated_keys": bool(
+            s.mtn_disbursement_subscription_key
+            or s.mtn_disbursement_api_user
+            or s.mtn_disbursement_api_key
+        ),
         "airtel_collections_configured": airtel,
-        "payment_webhook_secret_set": _set(s.payment_webhook_secret)
-        and s.payment_webhook_secret not in {"", "dev-webhook-secret-change-me"},
+        "airtel_disbursement_configured": airtel_disb,
+        "airtel_disbursement_pin_set": _set(s.airtel_disbursement_pin),
+        "payment_webhook_secret_set": webhook_ok,
         "fcm_server_key_set": _set(s.fcm_server_key),
         "otp_mock_mode": s.otp_mock_mode,
         "sms_provider_configured": sms,
@@ -82,7 +108,14 @@ def rails_readiness(settings: Settings | None = None) -> dict[str, Any]:
         "ready_for_mock_dry_run": True,
         "ready_for_momo_sandbox": mtn
         and not s.payment_mock_auto_success
-        and _set(s.payment_webhook_secret),
+        and webhook_ok,
+        # Collections + disbursement keys + public callback host + mock off
+        "ready_for_live_disbursement": (
+            not s.payment_mock_auto_success
+            and webhook_ok
+            and callback_reachable
+            and (mtn_disb or airtel_disb)
+        ),
         # Phones need a non-loopback TURN host + matching coturn external-ip
         "ready_for_carrier_calls": turn and has_turn_in_ice and not turn_local,
     }

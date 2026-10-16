@@ -121,3 +121,31 @@ EOF
   echo "  Access file:  $DIST/ACCESS.md"
   echo "============================================"
 }
+
+# Args: PUBLIC_URL — friend-facing SHARE.txt (also used by watchdog after rotate)
+demo_write_share() {
+  local URL="${1:?public url required}"
+  local ROOT="${DEMO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  local DIST="$ROOT/dist"
+  local LAN APK_SIZE=""
+  LAN=$(demo_detect_lan_ip)
+  [[ -f "$DIST/wamu-phone.apk" ]] && APK_SIZE=$(du -h "$DIST/wamu-phone.apk" | awk '{print $1}')
+
+  cat >"$DIST/SHARE.txt" <<EOF
+Wamu is running on this PC.
+
+PUBLIC LINK (any network / mobile data):
+  App (Chrome):     $URL
+  Connect (APK):    $URL/connect
+  APK download:     $URL/media-files/wamu-phone.apk
+
+WI-FI (same network as this PC):
+  App:              http://${LAN}:8000
+  APK:              http://${LAN}:8088/wamu-phone.apk
+  USB copy:         $DIST/wamu-phone.apk ${APK_SIZE:+($APK_SIZE)}
+
+LOGIN: use any phone number + OTP 123456 (mock)
+
+Keep this PC awake. Stop with: ./stop_wamu.sh
+EOF
+}

@@ -15,6 +15,7 @@ from app.api.v1 import (
     devices,
     discover,
     favorites,
+    finance,
     health,
     media,
     notifications,
@@ -34,6 +35,8 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
+# Finance before businesses catch-alls so /businesses/{id}/finance/* resolves.
+api_router.include_router(finance.router, tags=["finance"])
 api_router.include_router(businesses.router, prefix="/businesses", tags=["businesses"])
 api_router.include_router(products.router, prefix="/products", tags=["products"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])

@@ -198,9 +198,19 @@ PY
     PB=$(body_of "$R")
     PID=$(echo "$PB" | json_get "print(d.get('id',''))")
     PSTAT=$(echo "$PB" | json_get "print(d.get('status',''))")
+    POTP=$(echo "$PB" | json_get "print(d.get('otp_required', False))")
     if [[ "$PCODE" == "200" || "$PCODE" == "201" ]]; then
-      ok "MoMo mock pay" "status=$PSTAT id=$PID"
-      if [[ -n "$PID" && "$PSTAT" != "SUCCESS" ]]; then
+      ok "MoMo mock pay" "status=$PSTAT id=$PID otp=$POTP"
+      if [[ -n "$PID" && ( "$PSTAT" == "PROCESSING" || "$POTP" == "True" || "$POTP" == "true" ) ]]; then
+        CONFIRM=$(python3 - <<'PY'
+import json
+print(json.dumps({"code": "123456"}))
+PY
+)
+        R=$(http POST "/payments/$PID/confirm-otp" "$CONFIRM" "$AUTH_C")
+        PSTAT2=$(body_of "$R" | json_get "print(d.get('status',''))")
+        [[ "$PSTAT2" == "SUCCESS" && "$(code_of "$R")" == "200" ]] && ok "MoMo OTP confirm" "status=$PSTAT2" || bad "MoMo OTP confirm" "HTTP $(code_of "$R") $PSTAT2"
+      elif [[ -n "$PID" && "$PSTAT" != "SUCCESS" ]]; then
         R=$(http POST "/payments/$PID/refresh" "" "$AUTH_C")
         PSTAT2=$(body_of "$R" | json_get "print(d.get('status',''))")
         [[ "$PSTAT2" == "SUCCESS" || "$(code_of "$R")" == "200" ]] && ok "Payment refresh" "status=$PSTAT2" || bad "Payment refresh" "HTTP $(code_of "$R") $PSTAT2"

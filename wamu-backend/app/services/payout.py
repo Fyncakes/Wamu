@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -42,22 +42,23 @@ def resolve_payout_provider(business: Business, payment: Payment) -> str:
 
 def compute_platform_fee(gross: Decimal, fee_bps: int | None = None) -> tuple[Decimal, Decimal, int]:
     """
-    Split collection into (net_to_merchant, platform_fee, bps).
-    Fee is ROUND_DOWN to the UGX cent; never creates a Wamu wallet balance.
+    Split a gross amount into (net, platform_fee, bps).
+
+    Prefer ``commission.compute_for_order`` for live payouts (fee on subtotal,
+    delivery excluded). This helper remains for tests / legacy call sites.
     """
+    from app.services.commission import bps_of, to_minor
+
     bps = get_settings().platform_fee_bps if fee_bps is None else int(fee_bps)
     if bps < 0:
         bps = 0
-    if bps == 0 or gross <= 0:
-        return gross, Decimal("0.00"), 0
-    fee = (gross * Decimal(bps) / Decimal(10000)).quantize(
-        Decimal("0.01"), rounding=ROUND_DOWN
-    )
-    net = (gross - fee).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-    if net <= 0:
-        # Degenerate tiny order — refuse fee rather than zero out merchant
-        return gross, Decimal("0.00"), 0
-    return net, fee, bps
+    gross_i = to_minor(gross)
+    if bps == 0 or gross_i <= 0:
+        return Decimal(gross_i), Decimal("0"), 0
+    fee_i = bps_of(gross_i, bps)
+    if fee_i >= gross_i:
+        return Decimal(gross_i), Decimal("0"), 0
+    return Decimal(gross_i - fee_i), Decimal(fee_i), bps
 
 
 async def reverse_payout_for_payment(
@@ -77,12 +78,18 @@ async def reverse_payout_for_payment(
         return None
     if payout.status == PayoutStatus.REVERSED.value:
         return payout
-    if payout.status == PayoutStatus.SUCCESS.value:
+    was_success = payout.status == PayoutStatus.SUCCESS.value
+    if was_success:
         payout.status = PayoutStatus.REVERSED.value
         payout.raw_response = {
             **(payout.raw_response or {}),
             "reversed_reason": reason,
         }
+        from app.services.ledger import post_payout_reversal
+
+        await post_payout_reversal(
+            db, payout, created_by="system", reason=reason
+        )
     elif payout.status in {
         PayoutStatus.PENDING.value,
         PayoutStatus.PROCESSING.value,
@@ -177,7 +184,13 @@ async def enqueue_payout_for_payment(
         return None
 
     provider_name = resolve_payout_provider(business, payment)
-    net, fee, bps = compute_platform_fee(Decimal(payment.amount))
+    # Commission on order subtotal (excl. delivery) — same engine as ledger.
+    from app.services.commission import compute_for_order
+
+    breakdown = compute_for_order(order)
+    net = breakdown.as_decimal_net()
+    fee = breakdown.as_decimal_fee()
+    bps = breakdown.commission_bps
     payout = MerchantPayout(
         payment_id=payment.id,
         order_id=order.id,
@@ -201,6 +214,32 @@ async def enqueue_payout_for_payment(
         )
 
     metrics.incr(PAYOUT_INITIATED)
+
+    # Phase B: queue entitlement without calling disbursement when auto-execute is off.
+    if not get_settings().payout_auto_execute:
+        payout.raw_response = {
+            **(payout.raw_response or {}),
+            "queued": True,
+            "auto_execute": False,
+        }
+        db.add(
+            AuditLog(
+                actor_id=business.owner_id,
+                action="PAYOUT_QUEUED",
+                entity_type="merchant_payout",
+                entity_id=payout.id,
+                metadata_json={
+                    "amount": str(payout.amount),
+                    "platform_fee": str(payout.platform_fee),
+                    "fee_bps": payout.fee_bps,
+                    "provider": provider_name,
+                    "payee": payee,
+                },
+            )
+        )
+        await db.flush()
+        return payout
+
     return await _initiate_disbursement(db, payout)
 
 
@@ -221,6 +260,7 @@ async def _initiate_disbursement(
         payout.status = PayoutStatus.FAILED.value
         payout.raw_response = {"error": str(exc)}
         metrics.incr(PAYOUT_FAILED)
+        await _notify_payout_failed(db, payout, reason=str(exc))
         await db.flush()
         return payout
     except Exception as exc:
@@ -239,6 +279,7 @@ async def _initiate_disbursement(
     elif result.status == "FAILED":
         payout.status = PayoutStatus.FAILED.value
         metrics.incr(PAYOUT_FAILED)
+        await _notify_payout_failed(db, payout, reason="provider_failed")
     else:
         payout.status = PayoutStatus.PROCESSING.value
     await db.flush()
@@ -246,6 +287,9 @@ async def _initiate_disbursement(
 
 
 async def _notify_payout_success(db: AsyncSession, payout: MerchantPayout) -> None:
+    from app.services.ledger import post_payout_settled
+
+    await post_payout_settled(db, payout, created_by="system")
     business = await db.get(Business, payout.business_id)
     if not business:
         return
@@ -281,6 +325,44 @@ async def _notify_payout_success(db: AsyncSession, payout: MerchantPayout) -> No
     )
 
 
+async def _notify_payout_failed(
+    db: AsyncSession, payout: MerchantPayout, *, reason: str = "failed"
+) -> None:
+    """Stub merchant + audit notification for failed disbursements (Phase B)."""
+    business = await db.get(Business, payout.business_id)
+    if not business:
+        return
+    db.add(
+        Notification(
+            user_id=business.owner_id,
+            type="PAYOUT_FAILED",
+            title="Payout failed",
+            body=f"UGX {payout.amount} to {payout.payee_phone} could not be sent",
+            data={
+                "payout_id": str(payout.id),
+                "payment_id": str(payout.payment_id),
+                "order_id": str(payout.order_id),
+                "reason": reason,
+                "audience": "merchant",
+            },
+        )
+    )
+    db.add(
+        AuditLog(
+            actor_id=business.owner_id,
+            action="PAYOUT_FAILED",
+            entity_type="merchant_payout",
+            entity_id=payout.id,
+            metadata_json={
+                "amount": str(payout.amount),
+                "provider": payout.provider,
+                "payee": payout.payee_phone,
+                "reason": reason,
+            },
+        )
+    )
+
+
 async def process_payout_webhook(
     db: AsyncSession, provider: str, payload: WebhookPayload
 ) -> dict:
@@ -302,42 +384,72 @@ async def process_payout_webhook(
         db.add(event)
         await db.flush()
 
+    prov = provider.upper()
+    ref = payload.provider_reference
+
+    # Merchant → rider → owner (same callback URL for all disbursements)
     payout = await db.scalar(
         select(MerchantPayout).where(
-            MerchantPayout.provider == provider.upper(),
-            MerchantPayout.provider_reference == payload.provider_reference,
+            MerchantPayout.provider == prov,
+            MerchantPayout.provider_reference == ref,
         )
     )
-    if not payout:
-        event.notes = "Payout not found"
+    if payout:
+        if payload.amount is not None and Decimal(payload.amount) != payout.amount:
+            event.notes = "Amount mismatch"
+            event.processed_at = datetime.now(timezone.utc)
+            await db.flush()
+            raise HTTPException(status_code=400, detail="Amount mismatch")
+        if payout.status == PayoutStatus.SUCCESS.value:
+            event.processed_at = datetime.now(timezone.utc)
+            await db.flush()
+            return {"status": "already_success", "kind": "merchant"}
+        if payload.status.upper() == "SUCCESS":
+            payout.status = PayoutStatus.SUCCESS.value
+            metrics.incr(PAYOUT_SUCCESS)
+            await _notify_payout_success(db, payout)
+        elif payload.status.upper() == "FAILED":
+            payout.status = PayoutStatus.FAILED.value
+            metrics.incr(PAYOUT_FAILED)
+            await _notify_payout_failed(db, payout, reason="webhook_failed")
+        else:
+            payout.status = PayoutStatus.PROCESSING.value
         event.processed_at = datetime.now(timezone.utc)
         await db.flush()
-        return {"status": "ignored", "reason": "payout_not_found"}
+        return {"status": "processed", "kind": "merchant", "payout_status": payout.status}
 
-    if payload.amount is not None and Decimal(payload.amount) != payout.amount:
-        event.notes = "Amount mismatch"
+    from app.models.payout import OwnerPayout, RiderPayout
+    from app.services import owner_payout as owner_svc
+    from app.services import rider_payout as rider_svc
+
+    rider = await db.scalar(
+        select(RiderPayout).where(
+            RiderPayout.provider == prov,
+            RiderPayout.provider_reference == ref,
+        )
+    )
+    if rider:
+        await rider_svc.apply_webhook_status(db, rider, payload.status)
         event.processed_at = datetime.now(timezone.utc)
         await db.flush()
-        raise HTTPException(status_code=400, detail="Amount mismatch")
+        return {"status": "processed", "kind": "rider", "payout_status": rider.status}
 
-    if payout.status == PayoutStatus.SUCCESS.value:
+    owner = await db.scalar(
+        select(OwnerPayout).where(
+            OwnerPayout.provider == prov,
+            OwnerPayout.provider_reference == ref,
+        )
+    )
+    if owner:
+        await owner_svc.apply_webhook_status(db, owner, payload.status)
         event.processed_at = datetime.now(timezone.utc)
         await db.flush()
-        return {"status": "already_success"}
+        return {"status": "processed", "kind": "owner", "payout_status": owner.status}
 
-    if payload.status.upper() == "SUCCESS":
-        payout.status = PayoutStatus.SUCCESS.value
-        metrics.incr(PAYOUT_SUCCESS)
-        await _notify_payout_success(db, payout)
-    elif payload.status.upper() == "FAILED":
-        payout.status = PayoutStatus.FAILED.value
-        metrics.incr(PAYOUT_FAILED)
-    else:
-        payout.status = PayoutStatus.PROCESSING.value
-
+    event.notes = "Payout not found"
     event.processed_at = datetime.now(timezone.utc)
     await db.flush()
-    return {"status": "processed", "payout_status": payout.status}
+    return {"status": "ignored", "reason": "payout_not_found"}
 
 
 async def reconcile_pending_payouts(
@@ -378,11 +490,15 @@ async def reconcile_pending_payouts(
                 elif new_status == "FAILED" and payout.status != PayoutStatus.FAILED.value:
                     payout.status = PayoutStatus.FAILED.value
                     metrics.incr(PAYOUT_FAILED)
+                    await _notify_payout_failed(db, payout, reason="reconcile_failed")
                     updated += 1
                 elif new_status == "PROCESSING":
                     payout.status = PayoutStatus.PROCESSING.value
-            elif payout.status == PayoutStatus.PENDING.value:
-                # Never initiated — retry
+            elif (
+                payout.status == PayoutStatus.PENDING.value
+                and get_settings().payout_auto_execute
+            ):
+                # Never initiated — retry only when auto-execute is on
                 await _initiate_disbursement(db, payout)
                 updated += 1
 
@@ -393,7 +509,9 @@ async def reconcile_pending_payouts(
                 payout.status in open_statuses
                 and created is not None
                 and created < cutoff
+                and get_settings().payout_auto_execute
             ):
+                # Queued entitlements (auto-execute off) must not expire into FAILED
                 payout.status = PayoutStatus.FAILED.value
                 payout.raw_response = {
                     **(payout.raw_response or {}),
@@ -401,6 +519,7 @@ async def reconcile_pending_payouts(
                     "expired_at": now.isoformat(),
                 }
                 metrics.incr(PAYOUT_FAILED)
+                await _notify_payout_failed(db, payout, reason="reconcile_expired")
                 expired += 1
                 updated += 1
         except Exception:
@@ -447,3 +566,99 @@ async def retry_payout(
     payout.status = PayoutStatus.PENDING.value
     await db.flush()
     return await _initiate_disbursement(db, payout)
+
+
+async def execute_payout(
+    db: AsyncSession, admin: User, payout_id: uuid.UUID
+) -> MerchantPayout:
+    """
+    Phase C — admin forces disbursement for a queued/failed payout.
+    Works even when PAYOUT_AUTO_EXECUTE=false.
+    """
+    payout = await db.get(MerchantPayout, payout_id)
+    if not payout:
+        raise HTTPException(status_code=404, detail="Payout not found")
+    if payout.status == PayoutStatus.SUCCESS.value:
+        return payout
+    if payout.status == PayoutStatus.REVERSED.value:
+        raise HTTPException(status_code=400, detail="Cannot execute a reversed payout")
+
+    before = payout.status
+    payout.status = PayoutStatus.PENDING.value
+    payout.raw_response = {
+        **(payout.raw_response or {}),
+        "admin_execute": True,
+        "executed_by": str(admin.id),
+    }
+    await db.flush()
+    payout = await _initiate_disbursement(db, payout)
+    db.add(
+        AuditLog(
+            actor_id=admin.id,
+            action="PAYOUT_EXECUTED",
+            entity_type="merchant_payout",
+            entity_id=payout.id,
+            metadata_json={
+                "before_status": before,
+                "after_status": payout.status,
+                "provider": payout.provider,
+                "amount": str(payout.amount),
+            },
+        )
+    )
+    await db.flush()
+    return payout
+
+
+async def execute_payout_queue(
+    db: AsyncSession,
+    admin: User,
+    *,
+    limit: int = 50,
+    payout_ids: list[uuid.UUID] | None = None,
+) -> dict:
+    """Batch-execute PENDING queue items (Phase C ops control)."""
+    open_statuses = {PayoutStatus.PENDING.value, PayoutStatus.FAILED.value}
+    if payout_ids:
+        q = select(MerchantPayout).where(MerchantPayout.id.in_(payout_ids))
+    else:
+        q = (
+            select(MerchantPayout)
+            .where(MerchantPayout.status.in_(open_statuses))
+            .order_by(MerchantPayout.created_at.asc())
+            .limit(limit)
+        )
+    rows = list((await db.scalars(q)).all())
+    executed = success = failed = skipped = 0
+    for payout in rows:
+        if payout.status == PayoutStatus.SUCCESS.value:
+            skipped += 1
+            continue
+        if payout.status == PayoutStatus.REVERSED.value:
+            skipped += 1
+            continue
+        executed += 1
+        result = await execute_payout(db, admin, payout.id)
+        if result.status == PayoutStatus.SUCCESS.value:
+            success += 1
+        elif result.status == PayoutStatus.FAILED.value:
+            failed += 1
+    summary = {
+        "selected": len(rows),
+        "executed": executed,
+        "success": success,
+        "failed": failed,
+        "skipped": skipped,
+        "processing": executed - success - failed,
+    }
+    db.add(
+        AuditLog(
+            actor_id=admin.id,
+            action="PAYOUT_QUEUE_EXECUTED",
+            entity_type="merchant_payout",
+            entity_id=None,
+            metadata_json=summary,
+        )
+    )
+    await db.flush()
+    return summary

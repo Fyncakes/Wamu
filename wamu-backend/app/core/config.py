@@ -68,11 +68,25 @@ class Settings(BaseSettings):
     rate_limit_otp_per_hour: int = 5
     rate_limit_api_per_minute: int = 120
     payment_mock_auto_success: bool = True
-    # Platform fee in basis points on merchant payout (250 = 2.5%). Fee stays in
-    # MoMo float — Wamu never holds a wallet balance. 0 = pay full collection.
-    platform_fee_bps: int = 0
+    # When mock MoMo is on, MTN/AIRTEL payments wait for a Wamu-owned OTP
+    # (same mock code as login when OTP_MOCK_MODE=true) before SUCCESS.
+    payment_momo_otp_enabled: bool = True
+    # Platform commission in basis points on order **subtotal** (excl. delivery).
+    # 250 = 2.5%. Fee stays in MoMo float — Wamu never holds a wallet balance.
+    platform_fee_bps: int = 250
+    # Estimated MoMo provider fee (bps of customer total), absorbed by Wamu.
+    # Phase B statement matching replaces estimates with provider truth over time.
+    provider_fee_bps: int = 150
+    # Phase B/C: when false, MerchantPayout rows stay PENDING (queue) — no disbursement API call.
+    # Demo/mock keeps true so friend tests still see SUCCESS payouts.
+    # Production: false until ops approve auto-disburse; admin can still Execute from queue.
+    payout_auto_execute: bool = True
+    # Alert when open suspense balance (minor units) exceeds this threshold.
+    suspense_alert_threshold_minor: int = 100_000
     # HMAC secret for POST /payments/webhooks/{provider} (X-Wamu-Signature / provider headers)
     payment_webhook_secret: str = "dev-webhook-secret-change-me"
+    # Public API origin for provider callbacks (no trailing slash)
+    public_api_base: str = "http://127.0.0.1:8000"
     # MTN MoMo Collections (leave empty until staging credentials issued)
     mtn_subscription_key: str = ""
     mtn_api_user: str = ""
@@ -80,11 +94,20 @@ class Settings(BaseSettings):
     mtn_webhook_secret: str = ""
     mtn_base_url: str = "https://sandbox.momodeveloper.mtn.com"
     mtn_target_environment: str = "sandbox"
+    # Optional Disbursement product credentials (fall back to Collections keys if empty)
+    mtn_disbursement_subscription_key: str = ""
+    mtn_disbursement_api_user: str = ""
+    mtn_disbursement_api_key: str = ""
     # Airtel Money
     airtel_client_id: str = ""
     airtel_client_secret: str = ""
     airtel_webhook_secret: str = ""
     airtel_base_url: str = "https://openapiuat.airtel.africa"
+    # Encrypted PIN required by Airtel B2C disbursement (leave empty until issued)
+    airtel_disbursement_pin: str = ""
+    # Platform commission withdrawal destination (owner MoMo)
+    owner_payout_phone: str = ""
+    owner_payout_provider: str = "MTN"  # MTN | AIRTEL | MOCK
     admin_bootstrap_phone: str = "+256700000001"
     public_media_base: str = "http://127.0.0.1:8000"
     # Fan-out chat events via Redis when available (multi-instance safe)

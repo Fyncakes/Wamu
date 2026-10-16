@@ -68,9 +68,12 @@ String? notificationDeepLink({
       if (conversationId != null) return '/chat/$conversationId';
       return '/business-owner/orders';
     case 'PAYOUT_SUCCESS':
-      return '/business-owner/payouts';
+    case 'PAYOUT_FAILED':
     case 'PAYOUT_REVERSED':
       return '/business-owner/payouts';
+    case 'RIDER_PAYOUT_SUCCESS':
+    case 'RIDER_PAYOUT_FAILED':
+      return '/rider/payouts';
     case 'BUSINESS_VERIFIED':
       return '/business-owner';
     case 'DELIVERY_CANCELLED':

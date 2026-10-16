@@ -188,7 +188,7 @@ async def test_stock_unchanged_until_pay_then_restock_on_cancel(env):
         headers=ch,
         json={
             "order_id": order2_id,
-            "provider": "MTN",
+            "provider": "MOCK",
             "idempotency_key": f"stock-pay-{uuid4().hex[:12]}",
             "phone": "+256722200002",
         },

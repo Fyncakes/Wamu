@@ -275,7 +275,8 @@ async def test_mock_collection_to_payout_dry_run(dry_run_env):
     assert rows[0]["status"] == "SUCCESS"
     assert rows[0]["order_id"] == order_id
     assert rows[0]["payee_phone"] == "+256700111222"
-    assert Decimal(str(rows[0]["amount"])) == Decimal("8000.00")
+    # 2.5% of 8000 subtotal → net 7800
+    assert Decimal(str(rows[0]["amount"])) == Decimal("7800.00")
 
 
 @pytest.mark.asyncio

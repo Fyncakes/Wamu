@@ -1,3 +1,51 @@
+export interface FinanceOverview {
+  currency: string;
+  gmv_minor: number;
+  commission_earned_minor: number;
+  provider_fees_est_minor: number;
+  merchant_payable_minor: number;
+  rider_payable_minor: number;
+  refunds_minor: number;
+  settled_to_merchants_minor: number;
+  suspense_minor?: number;
+  payout_queue_count?: number;
+  payout_queue_minor?: number;
+}
+
+export interface SuspenseItem {
+  id: string;
+  statement_line_id: string;
+  provider: string;
+  amount_minor: number;
+  currency: string;
+  reason: string;
+  status: string;
+  resolution_notes?: string | null;
+  created_at?: string;
+  resolved_at?: string | null;
+}
+
+export interface PayoutQueuePage {
+  items: MerchantPayout[];
+  total: number;
+  page: number;
+  page_size: number;
+  auto_execute: boolean;
+}
+
+export interface ReconciliationRunResult {
+  status: string;
+  batch_id: string;
+  run: {
+    id: string;
+    matched: number;
+    unmatched: number;
+    suspense: number;
+    lines_total: number;
+    status: string;
+  };
+}
+
 export interface AdminStats {
   users: number;
   businesses: number;
@@ -127,10 +175,15 @@ export interface RailsReadiness {
   environment?: string;
   payment_mock_auto_success?: boolean;
   otp_mock_mode?: boolean;
+  payout_auto_execute?: boolean;
   ready_for_live_otp?: boolean;
   ready_for_momo_sandbox?: boolean;
+  ready_for_live_disbursement?: boolean;
   mtn_collections_configured?: boolean;
+  mtn_disbursement_configured?: boolean;
   airtel_collections_configured?: boolean;
+  airtel_disbursement_configured?: boolean;
+  disbursement_callback_reachable?: boolean;
   fcm_server_key_set?: boolean;
   sms_provider_configured?: boolean;
   turn_configured?: boolean;

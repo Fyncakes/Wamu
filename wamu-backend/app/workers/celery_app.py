@@ -39,6 +39,12 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=2, minute=30),
         "kwargs": {"stale_hours": 24, "limit": 500},
     },
+    # Phase B — daily provider statement match (synthetic until live APIs)
+    "statement-reconciliation-daily": {
+        "task": "wamu.statement_reconciliation",
+        "schedule": crontab(hour=3, minute=30),
+        "kwargs": {"provider": "MTN"},
+    },
     # Short-video lifecycle: Active → Archived → Permanently deleted (age-based).
     "video-lifecycle-nightly": {
         "task": "wamu.video_lifecycle",

@@ -50,6 +50,11 @@ def main() -> int:
         action="store_true",
         help="Exit 1 unless live OTP + MoMo sandbox + FCM are ready (private-beta gate)",
     )
+    parser.add_argument(
+        "--strict-disbursement",
+        action="store_true",
+        help="Exit 1 unless ready_for_live_disbursement is true",
+    )
     args = parser.parse_args()
     data = _remote(args.url) if args.url else _local()
     print(json.dumps(data, indent=2, sort_keys=True))
@@ -59,10 +64,15 @@ def main() -> int:
     otp = data.get("ready_for_live_otp")
     fcm = data.get("fcm_server_key_set")
     calls = data.get("ready_for_carrier_calls")
+    disb = data.get("ready_for_live_disbursement")
     print(file=sys.stderr)
     print(f"mock dry-run:     {'OK' if ok_mock else 'NO'}", file=sys.stderr)
     print(f"live OTP (AT):    {'OK' if otp else 'OTP_MOCK_MODE=false + AFRICASTALKING_*'}", file=sys.stderr)
     print(f"MoMo sandbox:     {'OK' if momo else 'fill MTN_* + PAYMENT_MOCK_AUTO_SUCCESS=false'}", file=sys.stderr)
+    print(
+        f"live disbursement: {'OK' if disb else 'PUBLIC_API_BASE + MTN_DISBURSEMENT_*/AIRTEL_* + mock off'}",
+        file=sys.stderr,
+    )
     print(f"FCM server key:   {'OK' if fcm else 'set FCM_SERVER_KEY'}", file=sys.stderr)
     print(
         f"carrier TURN:     {'OK' if calls else 'print_turn_env + --profile turn (non-loopback IP)'}",
@@ -73,6 +83,12 @@ def main() -> int:
     if args.strict_live and not (otp and momo and fcm):
         print(
             "\n[--strict-live] private beta incomplete — live OTP, MoMo, and FCM required",
+            file=sys.stderr,
+        )
+        return 1
+    if args.strict_disbursement and not disb:
+        print(
+            "\n[--strict-disbursement] not ready — see documentation/PHASE_C_GO_LIVE.md",
             file=sys.stderr,
         )
         return 1

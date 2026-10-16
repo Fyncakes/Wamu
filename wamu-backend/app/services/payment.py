@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -11,20 +11,90 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.integrations.payments.provider import get_payment_provider
+from app.core.config import get_settings
 from app.core.metrics import (
     PAYMENT_FAILED,
     PAYMENT_INITIATED,
     PAYMENT_SUCCESS,
     metrics,
 )
+from app.core.security import generate_otp, hash_token
+from app.integrations.payments.provider import get_payment_provider
+from app.integrations.sms.provider import get_sms_provider
 from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.models.order import Order, OrderStatus
-from app.models.payment import Payment, PaymentStatus, PaymentWebhookEvent
+from app.models.payment import Payment, PaymentOtpChallenge, PaymentStatus, PaymentWebhookEvent
 from app.models.user import User
-from app.schemas.commerce import PaymentCreate, WebhookPayload
+from app.schemas.commerce import PaymentCreate, PaymentResponse, WebhookPayload
 from app.services.order import get_order
+
+
+def _momo_otp_rail(provider: str) -> bool:
+    settings = get_settings()
+    return (
+        settings.payment_mock_auto_success
+        and settings.payment_momo_otp_enabled
+        and (provider or "").upper() in {"MTN", "AIRTEL"}
+    )
+
+
+def payment_to_response(payment: Payment, *, mock_hint: str | None = None) -> PaymentResponse:
+    raw = payment.raw_response or {}
+    otp_required = bool(raw.get("otp_required")) and payment.status in {
+        PaymentStatus.PENDING.value,
+        PaymentStatus.PROCESSING.value,
+    }
+    hint = mock_hint if mock_hint is not None else raw.get("mock_hint")
+    settings = get_settings()
+    if not settings.otp_mock_mode:
+        hint = None
+    return PaymentResponse(
+        id=payment.id,
+        order_id=payment.order_id,
+        user_id=payment.user_id,
+        amount=payment.amount,
+        currency=payment.currency,
+        provider=payment.provider,
+        provider_reference=payment.provider_reference,
+        status=payment.status,
+        created_at=getattr(payment, "created_at", None),
+        otp_required=otp_required,
+        mock_hint=hint if otp_required else None,
+        otp_expires_in=settings.otp_expire_seconds if otp_required else None,
+    )
+
+
+async def _issue_payment_otp(db: AsyncSession, payment: Payment) -> str | None:
+    """Create a Wamu MoMo OTP for this payment. Returns mock_hint when mock OTP is on."""
+    settings = get_settings()
+    phone = payment.phone
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone required for MoMo OTP")
+
+    code = settings.otp_mock_code if settings.otp_mock_mode else generate_otp()
+    challenge = PaymentOtpChallenge(
+        payment_id=payment.id,
+        phone=phone,
+        provider=payment.provider,
+        code_hash=hash_token(code),
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=settings.otp_expire_seconds),
+    )
+    db.add(challenge)
+    raw = dict(payment.raw_response or {})
+    raw["otp_required"] = True
+    raw["provider"] = payment.provider
+    if settings.otp_mock_mode:
+        raw["mock_hint"] = code
+    else:
+        raw.pop("mock_hint", None)
+    payment.raw_response = raw
+    await db.flush()
+    try:
+        await get_sms_provider().send_otp(phone, code)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return code if settings.otp_mock_mode else None
 
 
 async def finalize_payment_success(
@@ -65,6 +135,7 @@ async def finalize_payment_success(
         )
     )
 
+    from app.services.ledger import post_payment_confirmed
     from app.services.order import (
         commit_order_stock,
         notify_merchant_order_paid,
@@ -74,6 +145,7 @@ async def finalize_payment_success(
     from app.services.riders import ensure_delivery_for_paid_order
 
     await commit_order_stock(db, order)
+    await post_payment_confirmed(db, payment, order)
     await enqueue_payout_for_payment(db, payment)
     await ensure_delivery_for_paid_order(db, order)
     await db.refresh(order, attribute_names=["payment"])
@@ -179,8 +251,80 @@ async def initiate_payment(db: AsyncSession, user: User, data: PaymentCreate) ->
 
     if payment.status == PaymentStatus.SUCCESS.value:
         await finalize_payment_success(db, payment)
+    elif _momo_otp_rail(payment.provider) and (result.raw or {}).get("otp_required"):
+        await _issue_payment_otp(db, payment)
     await db.flush()
     return payment
+
+
+async def request_payment_otp(
+    db: AsyncSession, payment_id: uuid.UUID, user: User
+) -> PaymentResponse:
+    payment = await get_payment(db, payment_id, user)
+    if not _momo_otp_rail(payment.provider):
+        raise HTTPException(status_code=400, detail="MoMo OTP not used for this payment")
+    if payment.status == PaymentStatus.SUCCESS.value:
+        raise HTTPException(status_code=400, detail="Payment already successful")
+    if payment.status == PaymentStatus.FAILED.value:
+        raise HTTPException(status_code=400, detail="Payment failed — start a new payment")
+    hint = await _issue_payment_otp(db, payment)
+    await db.flush()
+    return payment_to_response(payment, mock_hint=hint)
+
+
+async def confirm_payment_otp(
+    db: AsyncSession, payment_id: uuid.UUID, user: User, code: str
+) -> PaymentResponse:
+    settings = get_settings()
+    payment = await get_payment(db, payment_id, user)
+    if not _momo_otp_rail(payment.provider):
+        raise HTTPException(status_code=400, detail="MoMo OTP not used for this payment")
+    if payment.status == PaymentStatus.SUCCESS.value:
+        return payment_to_response(payment)
+    if payment.status not in {
+        PaymentStatus.PENDING.value,
+        PaymentStatus.PROCESSING.value,
+    }:
+        raise HTTPException(status_code=400, detail="Payment cannot be confirmed")
+
+    result = await db.execute(
+        select(PaymentOtpChallenge)
+        .where(
+            PaymentOtpChallenge.payment_id == payment.id,
+            PaymentOtpChallenge.consumed_at.is_(None),
+        )
+        .order_by(PaymentOtpChallenge.created_at.desc())
+        .limit(1)
+    )
+    challenge = result.scalar_one_or_none()
+    if challenge is None:
+        raise HTTPException(status_code=400, detail="No MoMo OTP requested — resend code")
+
+    now = datetime.now(timezone.utc)
+    expires = challenge.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < now:
+        raise HTTPException(status_code=400, detail="MoMo OTP expired — resend code")
+    if challenge.attempts >= 5:
+        raise HTTPException(status_code=400, detail="Too many OTP attempts")
+
+    challenge.attempts += 1
+    if hash_token(code) != challenge.code_hash:
+        if not (settings.otp_mock_mode and code == settings.otp_mock_code):
+            await db.flush()
+            raise HTTPException(status_code=400, detail="Invalid MoMo OTP")
+
+    challenge.consumed_at = now
+    payment.status = PaymentStatus.SUCCESS.value
+    raw = dict(payment.raw_response or {})
+    raw["otp_required"] = False
+    raw["otp_confirmed_at"] = now.isoformat()
+    raw.pop("mock_hint", None)
+    payment.raw_response = raw
+    await finalize_payment_success(db, payment, audit_action="PAYMENT_MOMO_OTP_SUCCESS")
+    await db.flush()
+    return payment_to_response(payment)
 
 
 async def process_webhook(db: AsyncSession, provider: str, payload: WebhookPayload) -> dict:
@@ -202,6 +346,12 @@ async def process_webhook(db: AsyncSession, provider: str, payload: WebhookPaylo
     if not existing:
         db.add(event)
         await db.flush()
+
+    kind = (payload.kind or "").lower() if getattr(payload, "kind", None) else ""
+    if kind in {"disbursement", "payout", "transfer"}:
+        from app.services.payout import process_payout_webhook
+
+        return await process_payout_webhook(db, provider.upper(), payload)
 
     payment = await db.scalar(
         select(Payment).where(
@@ -307,8 +457,13 @@ async def attempt_collection_refund(
     try:
         provider = get_payment_provider(payment.provider)
         ref = payment.provider_reference or str(payment.id)
-        result = await provider.refund(ref)
-        rail_ok = True
+        result = await provider.refund(
+            ref, amount=payment.amount, currency=payment.currency or "UGX"
+        )
+        rail_ok = (getattr(result, "status", "") or "").upper() not in {
+            "FAILED",
+            "REJECTED",
+        }
         detail = getattr(result, "status", None) or "REFUNDED"
     except NotImplementedError as exc:
         logger.warning(
@@ -333,6 +488,15 @@ async def attempt_collection_refund(
     }
     payment.raw_response = {**(payment.raw_response or {}), "refund": meta}
     payment.status = PaymentStatus.REFUNDED.value
+
+    order = await get_order(db, payment.order_id)
+    from app.services.ledger import post_refund_reversal
+    from app.services.payout import reverse_payout_for_payment
+
+    await post_refund_reversal(
+        db, payment, order, reason=reason, created_by="system"
+    )
+    await reverse_payout_for_payment(db, payment, reason=reason)
 
     if not rail_ok:
         db.add(

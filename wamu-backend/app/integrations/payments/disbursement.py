@@ -2,6 +2,8 @@
 Disbursement adapters — transfer to merchant payee MSISDN (non-custodial).
 
 Separate from Collections (`PaymentProvider`). Same mock/staging pattern.
+Live MTN/Airtel paths activate when PAYMENT_MOCK_AUTO_SUCCESS=false and
+credentials are set — otherwise adapters raise / return FAILED clearly.
 """
 
 from __future__ import annotations
@@ -13,10 +15,42 @@ from decimal import Decimal
 
 import httpx
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.integrations.payments.provider import PaymentInitResult
 
 logger = logging.getLogger(__name__)
+
+
+def _mtn_disbursement_creds(settings: Settings) -> tuple[str, str, str]:
+    """Prefer dedicated Disbursement product keys; fall back to Collections."""
+    sub = settings.mtn_disbursement_subscription_key or settings.mtn_subscription_key
+    user = settings.mtn_disbursement_api_user or settings.mtn_api_user
+    key = settings.mtn_disbursement_api_key or settings.mtn_api_key
+    return sub, user, key
+
+
+def _callback_url(settings: Settings, provider: str) -> str | None:
+    base = (settings.public_api_base or "").rstrip("/")
+    if not base or "127.0.0.1" in base or "localhost" in base:
+        # Providers cannot reach loopback — omit callback; rely on poll/reconcile
+        if settings.environment in {"production", "staging"}:
+            logger.warning(
+                "PUBLIC_API_BASE is local (%s) — disbursement callbacks disabled",
+                base or "(empty)",
+            )
+        return None
+    return f"{base}/api/v1/payments/webhooks/{provider.upper()}"
+
+
+def mtn_disbursement_configured(settings: Settings | None = None) -> bool:
+    s = settings or get_settings()
+    sub, user, key = _mtn_disbursement_creds(s)
+    return bool(sub and user and key)
+
+
+def airtel_disbursement_configured(settings: Settings | None = None) -> bool:
+    s = settings or get_settings()
+    return bool(s.airtel_client_id and s.airtel_client_secret)
 
 
 class DisbursementProvider(ABC):
@@ -78,8 +112,22 @@ class MTNDisbursementAdapter(DisbursementProvider):
     name = "MTN"
 
     def _configured(self) -> bool:
-        s = get_settings()
-        return bool(s.mtn_subscription_key and s.mtn_api_user and s.mtn_api_key)
+        return mtn_disbursement_configured()
+
+    async def _token(self, client: httpx.AsyncClient, settings: Settings) -> tuple[str | None, dict]:
+        sub, user, key = _mtn_disbursement_creds(settings)
+        token_url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/token/"
+        token_res = await client.post(
+            token_url,
+            headers={"Ocp-Apim-Subscription-Key": sub},
+            auth=(user, key),
+        )
+        if token_res.status_code >= 400:
+            return None, {
+                "token_error": token_res.status_code,
+                "body": token_res.text[:500],
+            }
+        return token_res.json().get("access_token"), {}
 
     async def initiate_disbursement(
         self,
@@ -92,27 +140,32 @@ class MTNDisbursementAdapter(DisbursementProvider):
         settings = get_settings()
         if not self._configured():
             raise RuntimeError(
-                "MTN disbursement credentials missing — set MTN_SUBSCRIPTION_KEY, "
-                "MTN_API_USER, MTN_API_KEY (or PAYMENT_MOCK_AUTO_SUCCESS for demos)"
+                "MTN disbursement credentials missing — set MTN_DISBURSEMENT_* "
+                "(or MTN_SUBSCRIPTION_KEY / MTN_API_USER / MTN_API_KEY)"
             )
+        sub, _, _ = _mtn_disbursement_creds(settings)
         external_id = str(uuid.uuid4())
         msisdn = (payee_phone or "").lstrip("+")
         url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/v1_0/transfer"
+        callback = _callback_url(settings, "MTN")
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                token_url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/token/"
-                token_res = await client.post(
-                    token_url,
-                    headers={"Ocp-Apim-Subscription-Key": settings.mtn_subscription_key},
-                    auth=(settings.mtn_api_user, settings.mtn_api_key),
-                )
-                if token_res.status_code >= 400:
+                access, token_err = await self._token(client, settings)
+                if not access:
                     return PaymentInitResult(
                         provider_reference=external_id,
                         status="FAILED",
-                        raw={"token_error": token_res.status_code, "body": token_res.text[:500]},
+                        raw=token_err,
                     )
-                access = token_res.json().get("access_token")
+                headers = {
+                    "Authorization": f"Bearer {access}",
+                    "X-Reference-Id": external_id,
+                    "X-Target-Environment": settings.mtn_target_environment,
+                    "Ocp-Apim-Subscription-Key": sub,
+                    "Content-Type": "application/json",
+                }
+                if callback:
+                    headers["X-Callback-Url"] = callback
                 res = await client.post(
                     url,
                     json={
@@ -123,20 +176,18 @@ class MTNDisbursementAdapter(DisbursementProvider):
                         "payerMessage": "Wamu merchant payout",
                         "payeeNote": f"Order payout {reference[:20]}",
                     },
-                    headers={
-                        "Authorization": f"Bearer {access}",
-                        "X-Reference-Id": external_id,
-                        "X-Target-Environment": settings.mtn_target_environment,
-                        "Ocp-Apim-Subscription-Key": settings.mtn_subscription_key,
-                        "Content-Type": "application/json",
-                    },
+                    headers=headers,
                 )
                 logger.info("MTN disbursement %s → %s", external_id, res.status_code)
                 status = "PENDING" if res.status_code in {200, 202} else "FAILED"
                 return PaymentInitResult(
                     provider_reference=external_id,
                     status=status,
-                    raw={"http_status": res.status_code, "body": res.text[:800]},
+                    raw={
+                        "http_status": res.status_code,
+                        "body": res.text[:800],
+                        "callback_url": callback,
+                    },
                 )
         except httpx.HTTPError as exc:
             logger.exception("MTN disbursement failed")
@@ -149,29 +200,26 @@ class MTNDisbursementAdapter(DisbursementProvider):
     async def check_status(self, reference: str) -> PaymentInitResult:
         settings = get_settings()
         if not self._configured():
-            return PaymentInitResult(provider_reference=reference, status="PENDING", raw={})
+            return PaymentInitResult(
+                provider_reference=reference, status="PENDING", raw={}
+            )
+        sub, _, _ = _mtn_disbursement_creds(settings)
         url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/v1_0/transfer/{reference}"
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                token_url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/token/"
-                token_res = await client.post(
-                    token_url,
-                    headers={"Ocp-Apim-Subscription-Key": settings.mtn_subscription_key},
-                    auth=(settings.mtn_api_user, settings.mtn_api_key),
-                )
-                if token_res.status_code >= 400:
+                access, token_err = await self._token(client, settings)
+                if not access:
                     return PaymentInitResult(
                         provider_reference=reference,
                         status="PENDING",
-                        raw={"token_error": token_res.status_code},
+                        raw=token_err,
                     )
-                access = token_res.json().get("access_token")
                 res = await client.get(
                     url,
                     headers={
                         "Authorization": f"Bearer {access}",
                         "X-Target-Environment": settings.mtn_target_environment,
-                        "Ocp-Apim-Subscription-Key": settings.mtn_subscription_key,
+                        "Ocp-Apim-Subscription-Key": sub,
                     },
                 )
                 try:
@@ -200,8 +248,24 @@ class AirtelDisbursementAdapter(DisbursementProvider):
     name = "AIRTEL"
 
     def _configured(self) -> bool:
-        s = get_settings()
-        return bool(s.airtel_client_id and s.airtel_client_secret)
+        return airtel_disbursement_configured()
+
+    async def _token(self, client: httpx.AsyncClient, settings: Settings) -> tuple[str | None, dict]:
+        token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
+        token_res = await client.post(
+            token_url,
+            data={
+                "client_id": settings.airtel_client_id,
+                "client_secret": settings.airtel_client_secret,
+                "grant_type": "client_credentials",
+            },
+        )
+        if token_res.status_code >= 400:
+            return None, {
+                "token_error": token_res.status_code,
+                "body": token_res.text[:500],
+            }
+        return token_res.json().get("access_token"), {}
 
     async def initiate_disbursement(
         self,
@@ -215,29 +279,24 @@ class AirtelDisbursementAdapter(DisbursementProvider):
         if not self._configured():
             raise RuntimeError(
                 "Airtel disbursement credentials missing — set AIRTEL_CLIENT_ID, "
-                "AIRTEL_CLIENT_SECRET (or PAYMENT_MOCK_AUTO_SUCCESS for demos)"
+                "AIRTEL_CLIENT_SECRET"
             )
-        external_id = f"AIRTEL-PAYOUT-{reference}-{uuid.uuid4().hex[:8]}"
+        if not settings.airtel_disbursement_pin and settings.environment == "production":
+            raise RuntimeError(
+                "AIRTEL_DISBURSEMENT_PIN required for production Airtel B2C"
+            )
+        external_id = f"AIRTEL-PAYOUT-{reference[:20]}-{uuid.uuid4().hex[:8]}"
         msisdn = (payee_phone or "").lstrip("+")
         url = f"{settings.airtel_base_url.rstrip('/')}/standard/v1/disbursements/"
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
-                token_res = await client.post(
-                    token_url,
-                    data={
-                        "client_id": settings.airtel_client_id,
-                        "client_secret": settings.airtel_client_secret,
-                        "grant_type": "client_credentials",
-                    },
-                )
-                if token_res.status_code >= 400:
+                access, token_err = await self._token(client, settings)
+                if not access:
                     return PaymentInitResult(
                         provider_reference=external_id,
                         status="FAILED",
-                        raw={"token_error": token_res.status_code, "body": token_res.text[:500]},
+                        raw=token_err,
                     )
-                access = token_res.json().get("access_token")
                 res = await client.post(
                     url,
                     json={
@@ -247,9 +306,9 @@ class AirtelDisbursementAdapter(DisbursementProvider):
                             "country": "UG",
                         },
                         "reference": external_id,
-                        "pin": "",
+                        "pin": settings.airtel_disbursement_pin or "",
                         "transaction": {
-                            "amount": float(amount),
+                            "amount": int(amount),
                             "id": external_id,
                             "type": "B2C",
                         },
@@ -276,8 +335,60 @@ class AirtelDisbursementAdapter(DisbursementProvider):
             )
 
     async def check_status(self, reference: str) -> PaymentInitResult:
-        # Enquiry endpoints vary; leave PENDING until webhook / dedicated status API
-        return PaymentInitResult(provider_reference=reference, status="PENDING", raw={})
+        settings = get_settings()
+        if not self._configured():
+            return PaymentInitResult(
+                provider_reference=reference, status="PENDING", raw={}
+            )
+        # Best-effort enquiry — path varies by Airtel product version
+        url = (
+            f"{settings.airtel_base_url.rstrip('/')}/standard/v1/disbursements/"
+            f"{reference}"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                access, token_err = await self._token(client, settings)
+                if not access:
+                    return PaymentInitResult(
+                        provider_reference=reference,
+                        status="PENDING",
+                        raw=token_err,
+                    )
+                res = await client.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {access}",
+                        "X-Country": "UG",
+                        "X-Currency": "UGX",
+                    },
+                )
+                try:
+                    data = res.json()
+                except Exception:
+                    data = {"body": res.text[:400], "http_status": res.status_code}
+                # Nested status shapes differ; normalize common paths
+                status_raw = ""
+                if isinstance(data, dict):
+                    txn = data.get("data") or data.get("transaction") or {}
+                    if isinstance(txn, dict):
+                        status_raw = str(
+                            txn.get("status") or txn.get("transaction_status") or ""
+                        ).upper()
+                    if not status_raw:
+                        status_raw = str(data.get("status") or "").upper()
+                if status_raw in {"SUCCESS", "SUCCESSFUL", "TS", "TIP"}:
+                    status = "SUCCESS"
+                elif status_raw in {"FAILED", "FAILURE", "TF"}:
+                    status = "FAILED"
+                else:
+                    status = "PENDING"
+                return PaymentInitResult(
+                    provider_reference=reference, status=status, raw=data
+                )
+        except httpx.HTTPError as exc:
+            return PaymentInitResult(
+                provider_reference=reference, status="PENDING", raw={"error": str(exc)}
+            )
 
 
 def get_disbursement_provider(name: str) -> DisbursementProvider:

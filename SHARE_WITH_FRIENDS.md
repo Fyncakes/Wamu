@@ -32,6 +32,9 @@ Same Wi‑Fi as your PC? They can use `http://YOUR-LAN-IP:8000` instead of the p
 
 ## Notes
 
-- OTP is still mock (`123456`) so friends can try without SMS cost
+- Login OTP is mock (`123456`) so friends can try without SMS cost
+- **MoMo pay (MTN / Airtel):** after checkout, enter the same Wamu MoMo code **`123456`** (demo). Resend is available in the dialog.
+- Merchants set payout phone under **Business → Payout settings**; riders under **Rider → Payout destination**
 - Public Cloudflare URL can change when you restart — re-share after `./start_wamu.sh`
 - For a fixed URL forever: `./infrastructure/setup_named_tunnel.sh`
+- Rebuild shareable clients after this change: `./start_wamu.sh --rebuild --apk`

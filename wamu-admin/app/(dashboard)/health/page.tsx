@@ -157,6 +157,18 @@ export default function HealthPage() {
                   }
                 />
                 <StatusCard
+                  label="Live disbursement"
+                  status={railFlag(!!rails.ready_for_live_disbursement)}
+                  detail={
+                    rails.ready_for_live_disbursement
+                      ? "Keys + public PUBLIC_API_BASE — Execute from Reconciliation"
+                      : rails.mtn_disbursement_configured ||
+                          rails.airtel_disbursement_configured
+                        ? "Need public PUBLIC_API_BASE + mock off + webhook secret"
+                        : "Waiting on MTN_DISBURSEMENT_* / AIRTEL_* credentials"
+                  }
+                />
+                <StatusCard
                   label="FCM push"
                   status={rails.fcm_server_key_set ? "set" : "not set"}
                   detail="FCM_SERVER_KEY + flutterfire configure on devices"

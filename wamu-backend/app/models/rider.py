@@ -108,6 +108,10 @@ class RiderProfile(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     ai_checks: Mapped[dict | None] = mapped_column(JSON)
     ai_ran_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # MoMo / Airtel destination for delivery-fee disbursements
+    payout_phone: Mapped[str | None] = mapped_column(String(20))
+    payout_provider: Mapped[str | None] = mapped_column(String(20))  # MTN | AIRTEL | MOCK
+
     # Admin review
     admin_note: Mapped[str | None] = mapped_column(Text)
     rejection_reason: Mapped[str | None] = mapped_column(Text)

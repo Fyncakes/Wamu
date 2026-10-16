@@ -145,6 +145,14 @@ class PaymentResponse(BaseModel):
     provider_reference: str | None
     status: str
     created_at: datetime | None = None
+    # Wamu MoMo OTP gate (MTN / Airtel mock). Not stored on Payment row.
+    otp_required: bool = False
+    mock_hint: str | None = None
+    otp_expires_in: int | None = None
+
+
+class PaymentOtpConfirm(BaseModel):
+    code: str = Field(min_length=4, max_length=8)
 
 
 class MerchantPayoutResponse(BaseModel):

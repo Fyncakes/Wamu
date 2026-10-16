@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import uuid
 from decimal import Decimal
@@ -18,6 +19,8 @@ from app.models.rider import Delivery, DeliveryStatus, Ride, RideStatus, RiderPr
 from app.models.user import User
 from app.schemas.discover import DeliveryResponse, RideCreate, RideResponse, RiderResponse
 from app.services.geocode import geocode_kampala_address, is_placeholder_dropoff
+
+logger = logging.getLogger(__name__)
 
 
 def _enqueue_rider_push(
@@ -563,6 +566,14 @@ async def advance_delivery(
             metrics.incr(ORDER_DELIVERED)
         metrics.incr(DELIVERY_COMPLETED)
         delivery.eta_minutes = 0
+        from app.services.rider_payout import enqueue_rider_payout_for_delivery
+
+        try:
+            await enqueue_rider_payout_for_delivery(db, delivery)
+        except Exception:
+            logger.exception(
+                "Rider payout enqueue failed delivery_id=%s", delivery.id
+            )
     await db.flush()
     if order is not None:
         from app.services.order import notify_delivery_status_in_chat

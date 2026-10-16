@@ -46,7 +46,13 @@ class PaymentProvider(ABC):
         ...
 
     @abstractmethod
-    async def refund(self, reference: str) -> PaymentInitResult:
+    async def refund(
+        self,
+        reference: str,
+        *,
+        amount: Decimal | None = None,
+        currency: str = "UGX",
+    ) -> PaymentInitResult:
         ...
 
 
@@ -74,19 +80,73 @@ class MockPaymentProvider(PaymentProvider):
             raw={"mock": True},
         )
 
-    async def refund(self, reference: str) -> PaymentInitResult:
+    async def refund(
+        self,
+        reference: str,
+        *,
+        amount: Decimal | None = None,
+        currency: str = "UGX",
+    ) -> PaymentInitResult:
         return PaymentInitResult(
             provider_reference=reference,
             status="REFUNDED",
-            raw={"mock": True},
+            raw={"mock": True, "amount": str(amount) if amount is not None else None},
         )
 
 
 class NamedMockPaymentProvider(MockPaymentProvider):
-    """Demo MoMo theater — same mock success path, labeled MTN / AIRTEL / MOCK."""
+    """Demo MoMo theater — labeled MTN / AIRTEL / MOCK.
+
+    MTN/AIRTEL stay PROCESSING until the client confirms a Wamu-owned OTP
+    (see payment_momo_otp_enabled). Plain MOCK still auto-SUCCESS for tests.
+    """
 
     def __init__(self, name: str) -> None:
         self.name = name.upper()
+
+    def _requires_wamu_otp(self) -> bool:
+        settings = get_settings()
+        return (
+            settings.payment_mock_auto_success
+            and settings.payment_momo_otp_enabled
+            and self.name in {"MTN", "AIRTEL"}
+        )
+
+    async def initiate_payment(
+        self,
+        *,
+        amount: Decimal,
+        currency: str,
+        reference: str,
+        phone: str | None,
+    ) -> PaymentInitResult:
+        if self._requires_wamu_otp():
+            ref = f"{self.name}-{reference}-{uuid.uuid4().hex[:8]}"
+            logger.info(
+                "MOCK %s payment %s amount=%s %s → PROCESSING (await Wamu OTP)",
+                self.name,
+                ref,
+                amount,
+                currency,
+            )
+            return PaymentInitResult(
+                provider_reference=ref,
+                status="PROCESSING",
+                raw={"mock": True, "otp_required": True, "provider": self.name},
+            )
+        return await super().initiate_payment(
+            amount=amount, currency=currency, reference=reference, phone=phone
+        )
+
+    async def check_status(self, reference: str) -> PaymentInitResult:
+        if self._requires_wamu_otp():
+            # Do not auto-SUCCESS on refresh — OTP confirm is the gate.
+            return PaymentInitResult(
+                provider_reference=reference,
+                status="PROCESSING",
+                raw={"mock": True, "otp_required": True, "provider": self.name},
+            )
+        return await super().check_status(reference)
 
 
 class MTNAdapter(PaymentProvider):
@@ -216,8 +276,71 @@ class MTNAdapter(PaymentProvider):
                 provider_reference=reference, status="PENDING", raw={"error": str(exc)}
             )
 
-    async def refund(self, reference: str) -> PaymentInitResult:
-        raise NotImplementedError("MTN refunds via separate MoMo refund API")
+    async def refund(
+        self,
+        reference: str,
+        *,
+        amount: Decimal | None = None,
+        currency: str = "UGX",
+    ) -> PaymentInitResult:
+        """MoMo Collection refund against a prior requesttopay reference."""
+        settings = get_settings()
+        if not self._configured():
+            raise RuntimeError("MTN credentials missing for refund")
+        external_id = str(uuid.uuid4())
+        url = f"{settings.mtn_base_url.rstrip('/')}/collection/v1_0/refund"
+        amt = str(int(amount)) if amount is not None else "0"
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                token_url = f"{settings.mtn_base_url.rstrip('/')}/collection/token/"
+                token_res = await client.post(
+                    token_url,
+                    headers={"Ocp-Apim-Subscription-Key": settings.mtn_subscription_key},
+                    auth=(settings.mtn_api_user, settings.mtn_api_key),
+                )
+                if token_res.status_code >= 400:
+                    return PaymentInitResult(
+                        provider_reference=external_id,
+                        status="FAILED",
+                        raw={
+                            "token_error": token_res.status_code,
+                            "body": token_res.text[:500],
+                        },
+                    )
+                access = token_res.json().get("access_token")
+                headers = {
+                    "Authorization": f"Bearer {access}",
+                    "X-Reference-Id": external_id,
+                    "X-Target-Environment": settings.mtn_target_environment,
+                    "Ocp-Apim-Subscription-Key": settings.mtn_subscription_key,
+                    "Content-Type": "application/json",
+                }
+                res = await client.post(
+                    url,
+                    json={
+                        "amount": amt,
+                        "currency": currency or "UGX",
+                        "externalId": external_id[:64],
+                        "payerMessage": "Wamu refund",
+                        "payeeNote": "Order refund",
+                        "referenceIdToRefund": reference,
+                    },
+                    headers=headers,
+                )
+                logger.info("MTN refund %s for %s → %s", external_id, reference, res.status_code)
+                status = "PENDING" if res.status_code in {200, 202} else "FAILED"
+                return PaymentInitResult(
+                    provider_reference=external_id,
+                    status=status,
+                    raw={"http_status": res.status_code, "body": res.text[:800]},
+                )
+        except httpx.HTTPError as exc:
+            logger.exception("MTN refund failed")
+            return PaymentInitResult(
+                provider_reference=external_id,
+                status="PENDING",
+                raw={"error": str(exc)},
+            )
 
 
 class AirtelAdapter(PaymentProvider):
@@ -354,8 +477,71 @@ class AirtelAdapter(PaymentProvider):
                 provider_reference=reference, status="PENDING", raw={"error": str(exc)}
             )
 
-    async def refund(self, reference: str) -> PaymentInitResult:
-        raise NotImplementedError("Airtel refunds via merchant refund API")
+    async def refund(
+        self,
+        reference: str,
+        *,
+        amount: Decimal | None = None,
+        currency: str = "UGX",
+    ) -> PaymentInitResult:
+        """Best-effort Airtel reverse / refund enquiry path."""
+        settings = get_settings()
+        if not self._configured():
+            raise RuntimeError("Airtel credentials missing for refund")
+        external_id = f"AIRTEL-REFUND-{uuid.uuid4().hex[:12]}"
+        url = f"{settings.airtel_base_url.rstrip('/')}/standard/v1/payments/refund"
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
+                token_res = await client.post(
+                    token_url,
+                    data={
+                        "client_id": settings.airtel_client_id,
+                        "client_secret": settings.airtel_client_secret,
+                        "grant_type": "client_credentials",
+                    },
+                )
+                if token_res.status_code >= 400:
+                    return PaymentInitResult(
+                        provider_reference=external_id,
+                        status="FAILED",
+                        raw={
+                            "token_error": token_res.status_code,
+                            "body": token_res.text[:500],
+                        },
+                    )
+                access = token_res.json().get("access_token")
+                body: dict = {
+                    "transaction": {
+                        "airtel_money_id": reference,
+                        "id": external_id,
+                    }
+                }
+                if amount is not None:
+                    body["transaction"]["amount"] = int(amount)
+                res = await client.post(
+                    url,
+                    json=body,
+                    headers={
+                        "Authorization": f"Bearer {access}",
+                        "Content-Type": "application/json",
+                        "X-Country": "UG",
+                        "X-Currency": currency or "UGX",
+                    },
+                )
+                logger.info("Airtel refund %s → %s", external_id, res.status_code)
+                return PaymentInitResult(
+                    provider_reference=external_id,
+                    status="PENDING" if res.status_code < 300 else "FAILED",
+                    raw={"http_status": res.status_code, "body": res.text[:800]},
+                )
+        except httpx.HTTPError as exc:
+            logger.exception("Airtel refund failed")
+            return PaymentInitResult(
+                provider_reference=external_id,
+                status="PENDING",
+                raw={"error": str(exc)},
+            )
 
 
 def get_payment_provider(name: str) -> PaymentProvider:

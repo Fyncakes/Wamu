@@ -118,6 +118,28 @@ def reconcile_payouts(stale_hours: int = 24, limit: int = 50) -> dict:
         return {"status": "error", "detail": str(exc)}
 
 
+@celery_app.task(name="wamu.statement_reconciliation")
+def statement_reconciliation(provider: str = "MTN") -> dict:
+    """Daily statement match → suspense for unmatched lines (Phase B)."""
+
+    async def _run() -> dict:
+        from app.core.database import AsyncSessionLocal
+        from app.services.statement_reconciliation import run_daily_reconciliation
+
+        async with AsyncSessionLocal() as db:
+            summary = await run_daily_reconciliation(
+                db, provider=provider, created_by="celery"
+            )
+            await db.commit()
+            return summary
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.exception("statement_reconciliation task failed")
+        return {"status": "error", "detail": str(exc)}
+
+
 @celery_app.task(name="wamu.video_lifecycle")
 def video_lifecycle() -> dict:
     """Age-based Active → Archived → Permanently deleted (never engagement-based)."""

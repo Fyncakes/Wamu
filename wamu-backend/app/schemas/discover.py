@@ -70,6 +70,14 @@ class RiderResponse(BaseModel):
     available_rides: bool
     lat: Decimal | None = None
     lng: Decimal | None = None
+    # Own-profile only — omit on public rider cards if not loaded
+    payout_phone: str | None = None
+    payout_provider: str | None = None
+
+
+class RiderPayoutSettingsUpdate(BaseModel):
+    payout_phone: str = Field(..., pattern=r"^\+256[0-9]{9}$")
+    payout_provider: str = Field(default="MTN", pattern="^(MTN|AIRTEL|MOCK)$")
 
 
 class DeliveryResponse(BaseModel):

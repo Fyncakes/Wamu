@@ -27,6 +27,7 @@ async def health():
         # Client UX flags — no secrets. Testers see honest copy for OTP/pay.
         "otp_mock": settings.otp_mock_mode,
         "payment_mock": settings.payment_mock_auto_success,
+        "payment_momo_otp": settings.payment_momo_otp_enabled,
     }
 
 

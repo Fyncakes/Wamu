@@ -15,6 +15,7 @@ from app.core.database import Base
 from app.integrations.payments.provider import PaymentInitResult
 from app.models.audit import AuditLog  # noqa: F401
 from app.models.business import Business, BusinessStatus, Category, VerificationStatus
+from app.models.ledger import LedgerAccountType, LedgerEntry  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
@@ -108,12 +109,13 @@ async def test_enqueue_payout_on_success(db: AsyncSession):
     assert payout.business_id == biz.id
     assert payout.payee_phone == biz.payout_phone
     assert payout.status == PayoutStatus.SUCCESS.value
-    assert payout.amount == Decimal("5000.00")
-    assert payout.platform_fee == Decimal("0.00")
-    assert payout.fee_bps == 0
+    # Default PLATFORM_FEE_BPS=250 on order subtotal (5000 → fee 125, net 4875)
+    assert payout.amount == Decimal("4875")
+    assert payout.platform_fee == Decimal("125")
+    assert payout.fee_bps == 250
     adapter.initiate_disbursement.assert_awaited()
     call_kw = adapter.initiate_disbursement.await_args.kwargs
-    assert call_kw["amount"] == Decimal("5000.00")
+    assert call_kw["amount"] == Decimal("4875")
 
     again = await enqueue_payout_for_payment(db, payment)
     assert again is not None
@@ -191,8 +193,9 @@ async def test_compute_platform_fee_helpers():
     assert (net, fee, bps) == (Decimal("5000.00"), Decimal("0.00"), 0)
 
     net, fee, bps = compute_platform_fee(Decimal("100.00"), fee_bps=250)
-    assert fee == Decimal("2.50")
-    assert net == Decimal("97.50")
+    # Integer UGX: floor(100 * 250 / 10000) = 2
+    assert fee == Decimal("2")
+    assert net == Decimal("98")
     assert bps == 250
 
 

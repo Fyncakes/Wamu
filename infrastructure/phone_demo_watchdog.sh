@@ -8,6 +8,9 @@ LOG_DIR="$DIST/demo-logs"
 PID_DIR="$DIST/demo-pids"
 URL_FILE="$DIST/DEMO_URL.txt"
 CF="$ROOT/.tools/cloudflared"
+# shellcheck source=demo_access.sh
+source "$ROOT/infrastructure/demo_access.sh"
+export DEMO_ROOT="$ROOT"
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
@@ -41,18 +44,19 @@ start_tunnel() {
 
   # Cloudflare quick tunnel only
   if [[ -x "$CF" ]]; then
-    nohup "$CF" tunnel --url http://127.0.0.1:8000 --no-autoupdate >"$LOG_DIR/tunnel.log" 2>&1 &
+    nohup "$CF" tunnel --protocol http2 --url http://127.0.0.1:8000 --no-autoupdate >"$LOG_DIR/tunnel.log" 2>&1 &
     echo $! >"$PID_DIR/tunnel.pid"
     for i in $(seq 1 45); do
       URL=$(grep -aoE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG_DIR/tunnel.log" 2>/dev/null | grep -v '://api.trycloudflare.com' | head -1 || true)
       if [[ -n "${URL:-}" ]]; then
-        echo "$URL" >"$URL_FILE"
-        echo "${URL}/api/v1" >"$DIST/API_URL.txt"
         sleep 2
-        curl -sf -m 12 "$URL/api/v1/health" >/dev/null 2>&1 && {
+        if curl -sf -m 12 "$URL/api/v1/health" >/dev/null 2>&1; then
+          demo_write_access "$URL" >/dev/null
+          demo_write_share "$URL"
+          echo "$URL" >"$LOG_DIR/tunnel_url.txt"
           echo "[watchdog $(date -Is)] cloudflared OK $URL"
           return 0
-        }
+        fi
       fi
       sleep 1
     done
@@ -64,11 +68,20 @@ start_tunnel() {
 }
 
 echo "[watchdog] started pid=$$"
+FAILS=0
 while true; do
   ensure_api || true
-  if ! tunnel_ok; then
-    echo "[watchdog $(date -Is)] tunnel unhealthy — restarting"
-    start_tunnel || true
+  if tunnel_ok; then
+    FAILS=0
+  else
+    FAILS=$((FAILS + 1))
+    echo "[watchdog $(date -Is)] tunnel check failed ($FAILS/3)"
+    # Require consecutive failures so a single Cloudflare blip does not rotate the URL.
+    if [[ "$FAILS" -ge 3 ]]; then
+      echo "[watchdog $(date -Is)] tunnel unhealthy — restarting"
+      start_tunnel || true
+      FAILS=0
+    fi
   fi
   sleep 25
 done

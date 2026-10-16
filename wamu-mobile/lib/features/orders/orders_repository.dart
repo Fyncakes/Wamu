@@ -100,7 +100,30 @@ class OrdersRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Initiate MoMo and poll until SUCCESS/FAILED or [timeout] elapses.
+  Future<Map<String, dynamic>> requestPaymentOtp(String paymentId) async {
+    final response = await _client.post('/payments/$paymentId/request-otp');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> confirmPaymentOtp({
+    required String paymentId,
+    required String code,
+  }) async {
+    final response = await _client.post(
+      '/payments/$paymentId/confirm-otp',
+      data: {'code': code},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  bool _otpRequired(Map<String, dynamic> payment) {
+    final flag = payment['otp_required'];
+    if (flag == true) return true;
+    if (flag?.toString().toLowerCase() == 'true') return true;
+    return false;
+  }
+
+  /// Initiate MoMo, collect Wamu OTP when required, then poll until terminal.
   Future<Map<String, dynamic>> payOrderAndAwait({
     required String orderId,
     required String idempotencyKey,
@@ -109,6 +132,12 @@ class OrdersRepository {
     Duration timeout = const Duration(seconds: 45),
     Duration interval = const Duration(seconds: 2),
     void Function(String status)? onStatus,
+    Future<String?> Function({
+      required String paymentId,
+      required String provider,
+      String? mockHint,
+      Future<void> Function()? onResend,
+    })? onOtpRequired,
   }) async {
     var payment = await payOrder(
       orderId: orderId,
@@ -123,6 +152,24 @@ class OrdersRepository {
     final id = payment['id']?.toString();
     if (id == null || id.isEmpty) return payment;
 
+    if (_otpRequired(payment) && onOtpRequired != null) {
+      onStatus?.call('OTP');
+      final code = await onOtpRequired(
+        paymentId: id,
+        provider: (payment['provider'] ?? provider).toString(),
+        mockHint: payment['mock_hint']?.toString(),
+        onResend: () async {
+          final resent = await requestPaymentOtp(id);
+          payment = resent;
+        },
+      );
+      if (code == null || code.isEmpty) return payment;
+      payment = await confirmPaymentOtp(paymentId: id, code: code);
+      status = (payment['status']?.toString() ?? '').toUpperCase();
+      onStatus?.call(status);
+      if (status == 'SUCCESS' || status == 'FAILED') return payment;
+    }
+
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(interval);
@@ -130,6 +177,23 @@ class OrdersRepository {
       status = (payment['status']?.toString() ?? '').toUpperCase();
       onStatus?.call(status);
       if (status == 'SUCCESS' || status == 'FAILED') return payment;
+      if (_otpRequired(payment) && onOtpRequired != null) {
+        onStatus?.call('OTP');
+        final code = await onOtpRequired(
+          paymentId: id,
+          provider: (payment['provider'] ?? provider).toString(),
+          mockHint: payment['mock_hint']?.toString(),
+          onResend: () async {
+            final resent = await requestPaymentOtp(id);
+            payment = resent;
+          },
+        );
+        if (code == null || code.isEmpty) return payment;
+        payment = await confirmPaymentOtp(paymentId: id, code: code);
+        status = (payment['status']?.toString() ?? '').toUpperCase();
+        onStatus?.call(status);
+        if (status == 'SUCCESS' || status == 'FAILED') return payment;
+      }
     }
     return payment;
   }

@@ -4,14 +4,18 @@ import type {
   AuthTokens,
   Business,
   Category,
+  FinanceOverview,
   HealthStatus,
   MerchantPayout,
   Order,
   OrderDispute,
   PaginatedResponse,
   Payment,
+  PayoutQueuePage,
   RailsReadiness,
+  ReconciliationRunResult,
   Report,
+  SuspenseItem,
   User,
 } from "./types";
 
@@ -143,6 +147,126 @@ export const api = {
 
   admin: {
     getStats: () => request<AdminStats>("/admin/stats"),
+    getFinanceOverview: () =>
+      request<FinanceOverview>("/admin/finance/overview"),
+
+    runReconciliation: (body?: {
+      provider?: string;
+      include_orphan?: boolean;
+      hours?: number;
+    }) =>
+      request<ReconciliationRunResult>("/admin/finance/reconcile/run", {
+        method: "POST",
+        body: JSON.stringify(body ?? { provider: "MTN" }),
+      }),
+
+    getSuspense: (params?: { status?: string; page?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.status) query.set("status", params.status);
+      if (params?.page) query.set("page", String(params.page));
+      const qs = query.toString();
+      return request<PaginatedResponse<SuspenseItem>>(
+        `/admin/finance/suspense${qs ? `?${qs}` : ""}`,
+      );
+    },
+
+    resolveSuspense: (
+      id: string,
+      body: { notes: string; action?: "write_off" | "ignore" },
+    ) =>
+      request<SuspenseItem>(`/admin/finance/suspense/${id}/resolve`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    getPayoutQueue: () =>
+      request<PayoutQueuePage>("/admin/finance/payout-queue"),
+
+    executePayout: (id: string) =>
+      request<MerchantPayout>(`/admin/finance/payout-queue/${id}/execute`, {
+        method: "POST",
+      }),
+
+    executePayoutQueue: (body?: { limit?: number; payout_ids?: string[] }) =>
+      request<{
+        status: string;
+        selected: number;
+        executed: number;
+        success: number;
+        failed: number;
+        skipped: number;
+      }>("/admin/finance/payout-queue/execute", {
+        method: "POST",
+        body: JSON.stringify(body ?? { limit: 50 }),
+      }),
+
+    getRiderPayoutQueue: () =>
+      request<PaginatedResponse<{
+        id: string;
+        amount: number;
+        payee_phone: string;
+        status: string;
+        provider?: string;
+        created_at?: string;
+      }>>("/admin/finance/rider-payout-queue"),
+
+    executeRiderPayout: (id: string) =>
+      request<{ id: string; status: string }>(
+        `/admin/finance/rider-payout-queue/${id}/execute`,
+        { method: "POST" },
+      ),
+
+    getOwnerPayouts: () =>
+      request<{
+        available_commission_minor: number;
+        owner_payout_phone_set: boolean;
+        items: Array<{
+          id: string;
+          amount_minor: number;
+          status: string;
+          payee_phone: string;
+          created_at?: string;
+        }>;
+        total: number;
+      }>("/admin/finance/owner-payouts"),
+
+    requestOwnerPayout: (body?: { amount_minor?: number; notes?: string }) =>
+      request<{ id: string; status: string; amount_minor: number }>(
+        "/admin/finance/owner-payouts/request",
+        { method: "POST", body: JSON.stringify(body ?? {}) },
+      ),
+
+    executeOwnerPayout: (id: string) =>
+      request<{ id: string; status: string }>(
+        `/admin/finance/owner-payouts/${id}/execute`,
+        { method: "POST" },
+      ),
+
+    getManualRefunds: () =>
+      request<PaginatedResponse<{
+        id: string;
+        order_id: string;
+        amount: number;
+        provider?: string;
+        provider_reference?: string | null;
+        refund?: { manual_required?: boolean; detail?: string; reason?: string };
+        created_at?: string;
+      }>>("/admin/finance/manual-refunds"),
+
+    importStatement: (body: {
+      provider?: string;
+      lines: Array<{
+        external_ref: string;
+        amount_minor?: number;
+        amount?: number;
+        currency?: string;
+      }>;
+      notes?: string;
+    }) =>
+      request<ReconciliationRunResult>("/admin/finance/reconcile/import", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
 
     getUsers: (params?: { page?: number; status?: string }) => {
       const query = new URLSearchParams();

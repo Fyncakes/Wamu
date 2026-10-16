@@ -28,6 +28,7 @@ import '../../features/move/delivery_workbench_screen.dart';
 import '../../features/move/rider_dashboard_screen.dart';
 import '../../features/move/rider_live_map_screen.dart';
 import '../../features/move/rider_onboarding_screen.dart';
+import '../../features/move/rider_payout_settings_screen.dart';
 import '../../features/move/wamu_move_screen.dart';
 import '../../features/orders/orders_screen.dart';
 import '../../features/products/product_detail_screen.dart';
@@ -178,6 +179,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/rider', builder: (_, __) => const RiderDashboardScreen()),
       GoRoute(path: '/rider/onboarding', builder: (_, __) => const RiderOnboardingScreen()),
       GoRoute(path: '/rider/vehicle', builder: (_, __) => const RiderVehicleScreen()),
+      GoRoute(path: '/rider/payouts', builder: (_, __) => const RiderPayoutSettingsScreen()),
       GoRoute(
         path: '/rider/live-map',
         builder: (_, state) => RiderLiveMapScreen(

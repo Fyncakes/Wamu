@@ -36,6 +36,11 @@ export default function DashboardPage() {
     [],
     5000,
   );
+  const { data: finance } = useAsyncData(
+    () => api.admin.getFinanceOverview(),
+    [],
+    5000,
+  );
   const { data: riders } = useAsyncData(async () => {
     const res = await api.admin.getRiders();
     return unwrapItems(res as { items?: RiderRow[] } | RiderRow[]) as RiderRow[];
@@ -131,6 +136,80 @@ export default function DashboardPage() {
               : "Disbursed after fee"
           }
           icon={<span className="text-lg">⇢</span>}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatsCard
+          label="Ledger GMV"
+          value={
+            finance ? formatCurrency(finance.gmv_minor) : "—"
+          }
+          hint="Provider clearing (customer payments)"
+          icon={<span className="text-lg">▣</span>}
+        />
+        <StatsCard
+          label="Commission (ledger)"
+          value={
+            finance
+              ? formatCurrency(finance.commission_earned_minor)
+              : "—"
+          }
+          hint="2.5% of order subtotals"
+          icon={<span className="text-lg">◈</span>}
+        />
+        <StatsCard
+          label="Provider fees (est.)"
+          value={
+            finance
+              ? formatCurrency(finance.provider_fees_est_minor)
+              : "—"
+          }
+          hint="Absorbed by Wamu (~1.5%)"
+          icon={<span className="text-lg">⬡</span>}
+        />
+        <StatsCard
+          label="Merchant payable"
+          value={
+            finance
+              ? formatCurrency(finance.merchant_payable_minor)
+              : "—"
+          }
+          hint={
+            finance
+              ? `Settled ${formatCurrency(finance.settled_to_merchants_minor)}`
+              : "Outstanding from ledger"
+          }
+          icon={<span className="text-lg">⇢</span>}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Link href="/reconciliation" className="block">
+          <StatsCard
+            label="Suspense"
+            value={
+              finance?.suspense_minor != null
+                ? formatCurrency(finance.suspense_minor)
+                : "—"
+            }
+            hint="Open reconciliation →"
+            icon={<span className="text-lg">⇄</span>}
+          />
+        </Link>
+        <StatsCard
+          label="Payout queue"
+          value={
+            finance?.payout_queue_count != null
+              ? formatNumber(finance.payout_queue_count)
+              : "—"
+          }
+          hint={
+            finance?.payout_queue_minor != null
+              ? formatCurrency(Number(finance.payout_queue_minor))
+              : "Pending entitlements"
+          }
+          icon={<span className="text-lg">⏳</span>}
         />
       </div>
 

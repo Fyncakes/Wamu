@@ -9,8 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
-from app.schemas.discover import DeliveryResponse, RideCreate, RideResponse, RiderResponse
+from app.schemas.discover import (
+    DeliveryResponse,
+    RideCreate,
+    RideResponse,
+    RiderPayoutSettingsUpdate,
+    RiderResponse,
+)
 from app.services import riders as riders_service
+from app.services import rider_payout as rider_payout_service
 
 router = APIRouter()
 
@@ -201,6 +208,44 @@ async def update_rider_location(
 ):
     rider = await riders_service.update_rider_location(db, user, lat=body.lat, lng=body.lng)
     return riders_service._rider_resp(rider)
+
+
+@router.patch("/riders/me/payout", response_model=RiderResponse)
+async def update_rider_payout_settings(
+    body: RiderPayoutSettingsUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set MoMo/Airtel destination for delivery-fee disbursements."""
+    rider = await rider_payout_service.update_rider_payout_settings(
+        db,
+        user,
+        payout_phone=body.payout_phone,
+        payout_provider=body.payout_provider,
+    )
+    return riders_service._rider_resp(rider)
+
+
+@router.get("/riders/me/payouts")
+async def list_my_rider_payouts(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await rider_payout_service.list_my_rider_payouts(db, user)
+    return [
+        {
+            "id": str(r.id),
+            "delivery_id": str(r.delivery_id),
+            "order_id": str(r.order_id),
+            "amount": float(r.amount),
+            "currency": r.currency,
+            "provider": r.provider,
+            "payee_phone": r.payee_phone,
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
 
 
 @router.get("/deliveries/mine", response_model=list[DeliveryResponse])

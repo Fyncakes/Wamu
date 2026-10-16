@@ -26,8 +26,19 @@ class _BusinessOverviewScreenState extends ConsumerState<BusinessOverviewScreen>
   }
 
   Future<Map<String, dynamic>> _load() async {
-    final res = await ref.read(apiClientProvider).get('/dashboard/business/overview');
-    return Map<String, dynamic>.from(res.data as Map);
+    final client = ref.read(apiClientProvider);
+    final res = await client.get('/dashboard/business/overview');
+    final d = Map<String, dynamic>.from(res.data as Map);
+    final bizId = d['business_id']?.toString();
+    if (bizId != null && bizId.isNotEmpty) {
+      try {
+        final fin = await client.get('/businesses/$bizId/finance/summary');
+        d['finance'] = Map<String, dynamic>.from(fin.data as Map);
+      } catch (_) {
+        // Older API / network — sales chips still work from overview.
+      }
+    }
+    return d;
   }
 
   @override
@@ -43,6 +54,9 @@ class _BusinessOverviewScreenState extends ConsumerState<BusinessOverviewScreen>
           }
           final d = snap.data!;
           final byStatus = Map<String, dynamic>.from(d['orders_by_status'] as Map? ?? {});
+          final finance = d['finance'] is Map
+              ? Map<String, dynamic>.from(d['finance'] as Map)
+              : null;
           return RefreshIndicator(
             onRefresh: () async => setState(() => _future = _load()),
             child: ListView(
@@ -59,6 +73,20 @@ class _BusinessOverviewScreenState extends ConsumerState<BusinessOverviewScreen>
                     _StatChip('GMV', formatUgx((d['gmv_ugx'] as num?)?.toDouble() ?? 0)),
                     _StatChip('Paid', formatUgx((d['paid_ugx'] as num?)?.toDouble() ?? 0)),
                     _StatChip('Earnings', formatUgx((d['earnings_ugx'] as num?)?.toDouble() ?? 0)),
+                    if (finance != null) ...[
+                      _StatChip(
+                        'Net (ledger)',
+                        formatUgx((finance['merchant_net_minor'] as num?)?.toDouble() ?? 0),
+                      ),
+                      _StatChip(
+                        'Commission',
+                        formatUgx((finance['commission_minor'] as num?)?.toDouble() ?? 0),
+                      ),
+                      _StatChip(
+                        'Outstanding',
+                        formatUgx((finance['outstanding_minor'] as num?)?.toDouble() ?? 0),
+                      ),
+                    ],
                     _StatChip('Orders', '${d['orders_total'] ?? 0}'),
                     _StatChip('Products', '${d['product_count'] ?? 0}'),
                     _StatChip('Reviews', '${d['review_count'] ?? 0} ★${(d['rating'] as num?)?.toStringAsFixed(1) ?? '0'}'),
