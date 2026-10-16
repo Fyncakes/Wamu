@@ -41,6 +41,46 @@ class FinanceSummaryResponse(BaseModel):
     pending_payouts_minor: int = 0
 
 
+class SalesTrendPoint(BaseModel):
+    period: str  # YYYY-MM-DD or YYYY-Www
+    sales_minor: int = 0
+    orders: int = 0
+
+
+class AttentionOrder(BaseModel):
+    id: UUID
+    status: str
+    total_minor: int
+    currency: str = "UGX"
+    created_at: datetime | None = None
+    customer_note: str | None = None
+
+
+class MerchantDashboardResponse(BaseModel):
+    """Merchant home KPIs — answers sold / earned / needs attention."""
+
+    business_id: UUID
+    business_name: str
+    currency: str = "UGX"
+    period: str = "30d"  # 7d | 30d | 90d | custom
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    # Only SUCCESS-collected money counts as sales
+    total_sales_minor: int = 0
+    net_earnings_minor: int = 0
+    settled_minor: int = 0
+    outstanding_minor: int = 0
+    commission_minor: int = 0
+    refunds_minor: int = 0
+    orders_total: int = 0
+    orders_by_status: dict[str, int] = Field(default_factory=dict)
+    pending_action_count: int = 0
+    attention: list[AttentionOrder] = Field(default_factory=list)
+    sales_trend: list[SalesTrendPoint] = Field(default_factory=list)
+    # Explicit: live figures from DB, never demo placeholders
+    data_source: str = "live_database"
+
+
 class FinanceLedgerPage(BaseModel):
     items: list[LedgerEntryResponse]
     total: int
@@ -65,7 +105,7 @@ class AdminFinanceOverview(BaseModel):
 class FinanceReportRequest(BaseModel):
     report_type: str = Field(
         default="earnings",
-        description="sales|earnings|commissions|refunds|settlements",
+        description="sales|orders|earnings|payments|products|deliveries",
     )
     date_from: datetime | None = None
     date_to: datetime | None = None

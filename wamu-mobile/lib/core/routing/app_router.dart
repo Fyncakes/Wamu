@@ -15,6 +15,7 @@ import '../../core/server_config.dart';
 import '../../features/business_owner/business_dashboard_screens.dart';
 import '../../features/business_owner/business_owner_screen.dart';
 import '../../features/business_owner/manage_videos_screen.dart';
+import '../../features/business_owner/merchant_dashboard_screen.dart';
 import '../../features/business_owner/payout_settings_screen.dart';
 import '../../features/businesses/business_detail_screen.dart';
 import '../../features/calls/calls_screen.dart';
@@ -206,7 +207,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/business-owner/reviews', builder: (_, __) => const ManageReviewsScreen()),
       GoRoute(path: '/business-owner/payouts', builder: (_, __) => const PayoutSettingsScreen()),
       GoRoute(path: '/business-owner/videos', builder: (_, __) => const ManageVideosScreen()),
-      GoRoute(path: '/business-owner/overview', builder: (_, __) => const BusinessOverviewScreen()),
+      GoRoute(
+        path: '/business-owner/overview',
+        builder: (_, __) => const MerchantDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/business-owner/reports',
+        builder: (_, state) => MerchantReportsScreen(
+          businessId: state.uri.queryParameters['businessId'],
+        ),
+      ),
       GoRoute(path: '/business-owner/customers', builder: (_, __) => const BusinessCustomersScreen()),
       GoRoute(path: '/business-owner/staff', builder: (_, __) => const BusinessStaffScreen()),
       GoRoute(path: '/business-owner/settings', builder: (_, __) => const BusinessSettingsScreen()),

@@ -19,6 +19,7 @@ from app.schemas.finance import (
     ExecutePayoutQueueRequest,
     FinanceLedgerPage,
     FinanceSummaryResponse,
+    MerchantDashboardResponse,
     OwnerPayoutRequest,
     PayoutQueueItem,
     PayoutQueuePage,
@@ -49,6 +50,29 @@ async def business_finance_summary(
 
 
 @router.get(
+    "/businesses/{business_id}/finance/dashboard",
+    response_model=MerchantDashboardResponse,
+)
+async def business_finance_dashboard(
+    business_id: UUID,
+    period: str = Query("30d", pattern="^(7d|30d|90d|custom)$"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Merchant home KPIs + sales trend + orders needing attention (live DB)."""
+    return await finance_service.merchant_dashboard(
+        db,
+        user,
+        business_id,
+        period=period,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+@router.get(
     "/businesses/{business_id}/finance/ledger",
     response_model=FinanceLedgerPage,
 )
@@ -75,7 +99,10 @@ async def business_finance_ledger(
 @router.get("/businesses/{business_id}/finance/reports")
 async def business_finance_reports(
     business_id: UUID,
-    report_type: str = Query("earnings"),
+    report_type: str = Query(
+        "earnings",
+        description="sales|orders|earnings|payments|products|deliveries",
+    ),
     format: str = Query("csv", pattern="^(csv|pdf|json)$"),
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -89,6 +116,7 @@ async def business_finance_reports(
             "report_type": report_type,
             "date_from": date_from,
             "date_to": date_to,
+            "data_source": "live_database",
         }
     if format == "csv":
         body = await finance_service.merchant_report_csv(

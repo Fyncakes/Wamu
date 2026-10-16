@@ -121,9 +121,15 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
           const SizedBox(height: 24),
           _OwnerTile(
             icon: Icons.insights_outlined,
-            title: 'Sales report',
-            subtitle: 'GMV, paid volume, earnings, order mix',
+            title: 'Dashboard',
+            subtitle: 'Sales, net earnings, and what needs you',
             onTap: () => context.push('/business-owner/overview'),
+          ),
+          _OwnerTile(
+            icon: Icons.download_outlined,
+            title: 'Reports & downloads',
+            subtitle: 'Sales, orders, earnings, payments — CSV / PDF',
+            onTap: () => context.push('/business-owner/reports'),
           ),
           _OwnerTile(
             icon: Icons.add_business,

@@ -366,3 +366,97 @@ async def test_finance_summary_for_owner(env):
     assert data["commission_minor"] == 500
     assert data["merchant_net_minor"] == 19500
     assert data["sales_gross_minor"] == 20000
+
+
+@pytest.mark.asyncio
+async def test_merchant_dashboard_kpis(env):
+    client = env["client"]
+    ch = env["customer_headers"]
+    order = await client.post(
+        "/api/v1/orders",
+        headers=ch,
+        json={
+            "business_id": env["biz_id"],
+            "fulfillment": "PICKUP",
+            "items": [{"product_id": env["product_id"], "quantity": 1}],
+        },
+    )
+    assert order.status_code == 201, order.text
+    await _pay_mock(client, ch, order.json()["id"])
+
+    res = await client.get(
+        f"/api/v1/businesses/{env['biz_id']}/finance/dashboard",
+        headers=env["owner_headers"],
+        params={"period": "30d"},
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["data_source"] == "live_database"
+    assert data["total_sales_minor"] == 20000
+    assert data["net_earnings_minor"] == 19500
+    assert data["orders_total"] >= 1
+    assert isinstance(data["sales_trend"], list)
+    assert isinstance(data["attention"], list)
+    assert data["business_name"] == "Ledger Kitchen"
+
+    forbidden = await client.get(
+        f"/api/v1/businesses/{env['biz_id']}/finance/dashboard",
+        headers=env["other_headers"],
+    )
+    assert forbidden.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_merchant_report_csv_types(env):
+    client = env["client"]
+    ch = env["customer_headers"]
+    order = await client.post(
+        "/api/v1/orders",
+        headers=ch,
+        json={
+            "business_id": env["biz_id"],
+            "fulfillment": "PICKUP",
+            "items": [{"product_id": env["product_id"], "quantity": 1}],
+        },
+    )
+    await _pay_mock(client, ch, order.json()["id"])
+
+    for report_type in (
+        "sales",
+        "orders",
+        "earnings",
+        "payments",
+        "products",
+        "deliveries",
+    ):
+        res = await client.get(
+            f"/api/v1/businesses/{env['biz_id']}/finance/reports",
+            headers=env["owner_headers"],
+            params={"report_type": report_type, "format": "csv"},
+        )
+        assert res.status_code == 200, f"{report_type}: {res.text}"
+        assert "text/csv" in res.headers.get("content-type", "")
+        body = res.text
+        assert len(body) > 10
+        if report_type == "sales":
+            assert "amount_ugx" in body
+            assert "SUCCESS" in body
+        if report_type == "products":
+            assert "qty_sold" in body
+            assert "Ledger Meal" in body
+
+    pdf = await client.get(
+        f"/api/v1/businesses/{env['biz_id']}/finance/reports",
+        headers=env["owner_headers"],
+        params={"report_type": "earnings", "format": "pdf"},
+    )
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.headers.get("content-type", "").startswith("application/pdf")
+    assert pdf.content[:4] == b"%PDF"
+
+    denied = await client.get(
+        f"/api/v1/businesses/{env['biz_id']}/finance/reports",
+        headers=env["other_headers"],
+        params={"report_type": "sales", "format": "csv"},
+    )
+    assert denied.status_code == 403
