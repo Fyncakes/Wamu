@@ -1,13 +1,10 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
+import '../../core/files/save_download.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/utils/ugx_formatter.dart';
@@ -568,16 +565,21 @@ class _MerchantReportsScreenState extends ConsumerState<MerchantReportsScreen> {
       );
       final bytes = res.data ?? <int>[];
       final ext = format == 'pdf' ? 'pdf' : 'csv';
-      final dir = await getTemporaryDirectory();
+      final mime =
+          format == 'pdf' ? 'application/pdf' : 'text/csv;charset=utf-8';
       final stamp = DateFormat('yyyyMMdd').format(DateTime.now());
-      final file = File('${dir.path}/wamu-$type-$stamp.$ext');
-      await file.writeAsBytes(bytes);
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject: 'Wamu $type report',
-        ),
+      final filename = 'wamu-$type-$stamp.$ext';
+      await saveAndShareBytes(
+        bytes: bytes,
+        filename: filename,
+        mimeType: mime,
+        subject: 'Wamu $type report',
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Saved $filename')),
+        );
+      }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
