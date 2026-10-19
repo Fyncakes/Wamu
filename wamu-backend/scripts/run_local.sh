@@ -19,6 +19,9 @@ export OTP_MOCK_MODE="${OTP_MOCK_MODE:-true}"
 export PAYMENT_MOCK_AUTO_SUCCESS="${PAYMENT_MOCK_AUTO_SUCCESS:-true}"
 export PYTHONPATH=.
 
+echo "[wamu] alembic upgrade head…"
+python -m alembic upgrade head
+
 echo "[wamu] bootstrap…"
 python -m scripts.bootstrap
 

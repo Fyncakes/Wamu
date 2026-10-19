@@ -216,6 +216,8 @@ def _ensure_sqlite_columns(sync_conn) -> None:
             ("submitted_at", "DATETIME"),
             ("reviewed_at", "DATETIME"),
             ("reviewed_by_id", "CHAR(32)"),
+            ("payout_phone", "VARCHAR(20)"),
+            ("payout_provider", "VARCHAR(20)"),
         ]
         for col, typ in rider_patches:
             if col not in rider_cols:
