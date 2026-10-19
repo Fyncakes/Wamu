@@ -91,6 +91,22 @@ docker compose -f infrastructure/docker-compose.yml \
 
 Mock OTP path stays `123456` until Africa’s Talking keys are set. Live OTP / MoMo / FCM still require your secrets (see below).
 
+## Google Cloud (Cloud Run) — recommended public API host
+
+For a stable HTTPS API (Play Store / MoMo callbacks), use the GCP scaffold:
+
+See **[`infrastructure/gcp/README.md`](../infrastructure/gcp/README.md)**.
+
+```bash
+cp infrastructure/gcp/env.gcp.example infrastructure/gcp/.env.gcp
+# edit GCP_PROJECT_ID, passwords, secrets
+./infrastructure/gcp/setup.sh
+./infrastructure/gcp/deploy_api.sh
+./infrastructure/gcp/deploy_worker.sh
+```
+
+Stack: Cloud Run (API + Celery) → Cloud SQL Postgres → Memorystore Redis (or Upstash) → Secret Manager → Artifact Registry.
+
 ## Production (not this compose file)
 
 Use `.env.production.example` as the contract. Production refuses DEBUG, OTP mocks, payment mocks, CORS `*`, and weak secrets. Do **not** reuse staging defaults.

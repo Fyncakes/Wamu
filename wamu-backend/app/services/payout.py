@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -38,6 +39,49 @@ def resolve_payout_provider(business: Business, payment: Payment) -> str:
     if payment.provider in {"MTN", "AIRTEL", "MOCK"}:
         return payment.provider
     return "MOCK"
+
+
+def _disbursement_callback_reachable() -> bool:
+    """True when PUBLIC_API_BASE is a host MTN/Airtel can POST callbacks to."""
+    base = (getattr(get_settings(), "public_api_base", None) or "").rstrip("/")
+    if not base:
+        return False
+    return not any(x in base for x in ("127.0.0.1", "localhost", "0.0.0.0"))
+
+
+async def _poll_processing_disbursement(
+    db: AsyncSession,
+    payout: MerchantPayout,
+    *,
+    attempts: int = 3,
+    delay_s: float = 1.5,
+) -> MerchantPayout:
+    """Poll provider when callbacks can't reach localhost (sandbox / local API)."""
+    if not payout.provider_reference:
+        return payout
+    provider = get_disbursement_provider(payout.provider)
+    for _ in range(attempts):
+        await asyncio.sleep(delay_s)
+        status_result = await provider.check_status(payout.provider_reference)
+        new_status = (status_result.status or "").upper()
+        payout.raw_response = {
+            **(payout.raw_response or {}),
+            "post_initiate_poll": status_result.raw,
+        }
+        if new_status == "SUCCESS":
+            payout.status = PayoutStatus.SUCCESS.value
+            metrics.incr(PAYOUT_SUCCESS)
+            await _notify_payout_success(db, payout)
+            await db.flush()
+            return payout
+        if new_status == "FAILED":
+            payout.status = PayoutStatus.FAILED.value
+            metrics.incr(PAYOUT_FAILED)
+            await _notify_payout_failed(db, payout, reason="poll_failed")
+            await db.flush()
+            return payout
+    await db.flush()
+    return payout
 
 
 def compute_platform_fee(gross: Decimal, fee_bps: int | None = None) -> tuple[Decimal, Decimal, int]:
@@ -283,6 +327,15 @@ async def _initiate_disbursement(
     else:
         payout.status = PayoutStatus.PROCESSING.value
     await db.flush()
+
+    # Local/sandbox: no public callback URL → poll briefly for terminal status.
+    if (
+        payout.status == PayoutStatus.PROCESSING.value
+        and payout.provider_reference
+        and payout.provider.upper() in {"MTN", "AIRTEL"}
+        and not _disbursement_callback_reachable()
+    ):
+        return await _poll_processing_disbursement(db, payout)
     return payout
 
 

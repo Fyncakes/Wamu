@@ -30,17 +30,25 @@ def _request(body: bytes, headers: dict[str, str]) -> Request:
 
 
 def test_normalize_mtn_successful_callback():
+    # Docs: referenceId is the X-Reference-Id from requesttopay
     raw = {
-        "externalId": "MTN-abc",
+        "referenceId": "a4c63f56-1995-4bdc-a6a2-973333126961",
+        "externalId": "WAMU-order-1",
         "status": "SUCCESSFUL",
         "amount": "15000",
-        "currency": "UGX",
+        "currency": "EUR",
         "financialTransactionId": "ftx-1",
     }
     out = normalize_webhook_payload("MTN", raw)
     assert out["status"] == "SUCCESS"
-    assert out["provider_reference"] == "MTN-abc"
+    assert out["provider_reference"] == "a4c63f56-1995-4bdc-a6a2-973333126961"
     assert out["event_id"] == "ftx-1"
+
+
+def test_normalize_mtn_falls_back_to_external_id():
+    raw = {"externalId": "MTN-abc", "status": "SUCCESSFUL", "financialTransactionId": "ftx-1"}
+    out = normalize_webhook_payload("MTN", raw)
+    assert out["provider_reference"] == "MTN-abc"
 
 
 def test_normalize_airtel_success():

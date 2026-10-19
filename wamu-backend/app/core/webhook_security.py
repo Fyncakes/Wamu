@@ -79,11 +79,27 @@ def verify_provider_webhook(provider: str, *, body: bytes, request: Request) -> 
     else:
         signature = _header(request, "X-Wamu-Signature")
 
+    # Sandbox / lab: MTN often sends callbacks with no signature. Only enforce HMAC
+    # when a dedicated MTN_WEBHOOK_SECRET is set (or in production).
     allow_unsigned = (
-        not settings.is_production
-        and settings.payment_mock_auto_success
-        and key in {"MOCK", "MTN", "AIRTEL"}
-        and not signature
+        not signature
+        and (
+            (
+                not settings.is_production
+                and settings.payment_mock_auto_success
+                and key in {"MOCK", "MTN", "AIRTEL"}
+            )
+            or (
+                key == "MTN"
+                and not settings.is_production
+                and not (settings.mtn_webhook_secret or "").strip()
+            )
+            or (
+                key == "AIRTEL"
+                and not settings.is_production
+                and not (settings.airtel_webhook_secret or "").strip()
+            )
+        )
     )
     if allow_unsigned:
         return
@@ -103,12 +119,12 @@ def normalize_webhook_payload(provider: str, data: dict[str, Any]) -> dict[str, 
     """
     key = (provider or "MOCK").upper()
     if key == "MTN":
-        # MoMo collection callback-ish shape (flexible for sandbox)
+        # MoMo callback: referenceId = our X-Reference-Id; status SUCCESSFUL|FAILED
         ref = (
             data.get("provider_reference")
+            or data.get("referenceId")
             or data.get("externalId")
             or data.get("financialTransactionId")
-            or data.get("referenceId")
             or ""
         )
         status_raw = str(data.get("status") or data.get("financialTransactionStatus") or "").upper()
@@ -120,7 +136,13 @@ def normalize_webhook_payload(provider: str, data: dict[str, Any]) -> dict[str, 
             status = status_raw or "PROCESSING"
         amount = data.get("amount")
         return {
-            "event_id": str(data.get("event_id") or data.get("financialTransactionId") or ref or "mtn-evt"),
+            "event_id": str(
+                data.get("event_id")
+                or data.get("financialTransactionId")
+                or data.get("referenceId")
+                or ref
+                or "mtn-evt"
+            ),
             "provider_reference": str(ref),
             "status": status,
             "amount": Decimal(str(amount)) if amount is not None else None,

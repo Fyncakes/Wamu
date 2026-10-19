@@ -56,7 +56,24 @@ AIRTEL_CLIENT_ID=...
 AIRTEL_CLIENT_SECRET=...
 AIRTEL_WEBHOOK_SECRET=...
 AIRTEL_BASE_URL=https://openapiuat.airtel.africa
+AIRTEL_COUNTRY=UG
+AIRTEL_CURRENCY=UGX
+AIRTEL_SIGN_COLLECTIONS=true
+AIRTEL_DISBURSEMENT_PIN=...   # required for B2C; RSA-encrypted at request time
 ```
+
+Portal: [developers.airtel.africa](https://developers.airtel.africa) → Uganda → add Collection-APIs + Disbursement-APIs → Partially Approved (TEST) → whitelist server IP → set Disbursement PIN.
+
+Validate credentials:
+
+```bash
+cd wamu-backend && python scripts/check_airtel_sandbox.py
+# optional live smokes:
+python scripts/check_airtel_sandbox.py --collect 752604392 --amount 500
+python scripts/check_airtel_sandbox.py --disburse 752604392 --amount 500
+```
+
+Adapters use Collection **v2** (signed `x-signature`/`x-key`, falls back to unsigned v1) and Disbursement **v2** (RSA PIN). MSISDNs are national format (`752…`, not `256752…`).
 
 Initiate returns **PENDING**; callbacks hit:
 

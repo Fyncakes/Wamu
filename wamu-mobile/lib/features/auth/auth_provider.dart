@@ -14,7 +14,11 @@ class AuthRepository {
   Future<String?> requestOtp(String phone) async {
     try {
       final response = await _client.post('/auth/request-otp', data: {'phone': phone});
-      await _storage.savePhone(phone);
+      try {
+        await _storage.savePhone(phone);
+      } catch (_) {
+        // Storage failures must not block login (common on LAN http web).
+      }
       final data = response.data;
       if (data is Map && data['mock_hint'] != null) {
         return data['mock_hint'].toString();

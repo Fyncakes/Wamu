@@ -148,6 +148,9 @@ class MTNDisbursementAdapter(DisbursementProvider):
         msisdn = (payee_phone or "").lstrip("+")
         url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/v1_0/transfer"
         callback = _callback_url(settings, "MTN")
+        momo_currency = (
+            "EUR" if settings.mtn_target_environment.lower() == "sandbox" else (currency or "UGX")
+        )
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 access, token_err = await self._token(client, settings)
@@ -170,7 +173,7 @@ class MTNDisbursementAdapter(DisbursementProvider):
                     url,
                     json={
                         "amount": str(int(amount)),
-                        "currency": currency,
+                        "currency": momo_currency,
                         "externalId": reference[:64],
                         "payee": {"partyIdType": "MSISDN", "partyId": msisdn},
                         "payerMessage": "Wamu merchant payout",
@@ -243,29 +246,12 @@ class MTNDisbursementAdapter(DisbursementProvider):
 
 
 class AirtelDisbursementAdapter(DisbursementProvider):
-    """Airtel Money disbursement (Uganda)."""
+    """Airtel Money B2C disbursement (Uganda) — Disbursement APIs v2 + RSA PIN."""
 
     name = "AIRTEL"
 
     def _configured(self) -> bool:
         return airtel_disbursement_configured()
-
-    async def _token(self, client: httpx.AsyncClient, settings: Settings) -> tuple[str | None, dict]:
-        token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
-        token_res = await client.post(
-            token_url,
-            data={
-                "client_id": settings.airtel_client_id,
-                "client_secret": settings.airtel_client_secret,
-                "grant_type": "client_credentials",
-            },
-        )
-        if token_res.status_code >= 400:
-            return None, {
-                "token_error": token_res.status_code,
-                "body": token_res.text[:500],
-            }
-        return token_res.json().get("access_token"), {}
 
     async def initiate_disbursement(
         self,
@@ -275,79 +261,113 @@ class AirtelDisbursementAdapter(DisbursementProvider):
         reference: str,
         payee_phone: str,
     ) -> PaymentInitResult:
+        from app.integrations.payments import airtel_common as ac
+
         settings = get_settings()
         if not self._configured():
             raise RuntimeError(
                 "Airtel disbursement credentials missing — set AIRTEL_CLIENT_ID, "
                 "AIRTEL_CLIENT_SECRET"
             )
-        if not settings.airtel_disbursement_pin and settings.environment == "production":
+        pin = (settings.airtel_disbursement_pin or "").strip()
+        if not pin:
             raise RuntimeError(
-                "AIRTEL_DISBURSEMENT_PIN required for production Airtel B2C"
+                "AIRTEL_DISBURSEMENT_PIN required for Airtel B2C "
+                "(set in developers.airtel.africa → Disbursement PIN)"
             )
-        external_id = f"AIRTEL-PAYOUT-{reference[:20]}-{uuid.uuid4().hex[:8]}"
-        msisdn = (payee_phone or "").lstrip("+")
-        url = f"{settings.airtel_base_url.rstrip('/')}/standard/v1/disbursements/"
+        country, cur = ac.country_currency(settings)
+        cur = (currency or cur or "UGX").upper()
+        txn_id = ac.new_transaction_id()
+        msisdn = ac.normalize_msisdn(payee_phone)
+        if not msisdn:
+            raise RuntimeError("Airtel disbursement requires a Uganda MSISDN")
+        url = f"{settings.airtel_base_url.rstrip('/')}/standard/v2/disbursements/"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                access, token_err = await self._token(client, settings)
+            async with httpx.AsyncClient(timeout=25.0) as client:
+                access, token_err = await ac.fetch_access_token(client, settings)
                 if not access:
                     return PaymentInitResult(
-                        provider_reference=external_id,
+                        provider_reference=txn_id,
                         status="FAILED",
                         raw=token_err,
+                    )
+                pub, key_err = await ac.fetch_encryption_key(client, settings, access)
+                if not pub:
+                    return PaymentInitResult(
+                        provider_reference=txn_id,
+                        status="FAILED",
+                        raw=key_err,
+                    )
+                try:
+                    enc_pin = ac.encrypt_pin(pub, pin)
+                except Exception as exc:
+                    logger.exception("Airtel PIN encryption failed")
+                    return PaymentInitResult(
+                        provider_reference=txn_id,
+                        status="FAILED",
+                        raw={"pin_encrypt_error": str(exc)},
                     )
                 res = await client.post(
                     url,
                     json={
                         "payee": {
                             "msisdn": msisdn,
-                            "currency": currency,
-                            "country": "UG",
+                            "currency": cur,
                         },
-                        "reference": external_id,
-                        "pin": settings.airtel_disbursement_pin or "",
+                        "reference": f"Wamu {reference}"[:25],
+                        "pin": enc_pin,
                         "transaction": {
                             "amount": int(amount),
-                            "id": external_id,
+                            "id": txn_id,
                             "type": "B2C",
                         },
                     },
                     headers={
                         "Authorization": f"Bearer {access}",
                         "Content-Type": "application/json",
-                        "X-Country": "UG",
-                        "X-Currency": currency,
+                        "Accept": "*/*",
+                        "X-Country": country,
+                        "X-Currency": cur,
                     },
                 )
-                logger.info("Airtel disbursement %s → %s", external_id, res.status_code)
+                try:
+                    data = res.json()
+                except Exception:
+                    data = {"body": res.text[:800]}
+                logger.info("Airtel disbursement %s → %s", txn_id, res.status_code)
+                ok = res.status_code < 300 and (
+                    not isinstance(data.get("status"), dict)
+                    or data["status"].get("success") is not False
+                )
                 return PaymentInitResult(
-                    provider_reference=external_id,
-                    status="PENDING" if res.status_code < 300 else "FAILED",
-                    raw={"http_status": res.status_code, "body": res.text[:800]},
+                    provider_reference=txn_id,
+                    status="PENDING" if ok else "FAILED",
+                    raw={"http_status": res.status_code, "response": data},
                 )
         except httpx.HTTPError as exc:
             logger.exception("Airtel disbursement failed")
             return PaymentInitResult(
-                provider_reference=external_id,
+                provider_reference=txn_id,
                 status="PENDING",
                 raw={"error": str(exc)},
             )
 
     async def check_status(self, reference: str) -> PaymentInitResult:
+        from app.integrations.payments import airtel_common as ac
+
         settings = get_settings()
         if not self._configured():
             return PaymentInitResult(
                 provider_reference=reference, status="PENDING", raw={}
             )
-        # Best-effort enquiry — path varies by Airtel product version
+        country, cur = ac.country_currency(settings)
         url = (
             f"{settings.airtel_base_url.rstrip('/')}/standard/v1/disbursements/"
             f"{reference}"
         )
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                access, token_err = await self._token(client, settings)
+                access, token_err = await ac.fetch_access_token(client, settings)
                 if not access:
                     return PaymentInitResult(
                         provider_reference=reference,
@@ -358,30 +378,16 @@ class AirtelDisbursementAdapter(DisbursementProvider):
                     url,
                     headers={
                         "Authorization": f"Bearer {access}",
-                        "X-Country": "UG",
-                        "X-Currency": "UGX",
+                        "Accept": "*/*",
+                        "X-Country": country,
+                        "X-Currency": cur,
                     },
                 )
                 try:
                     data = res.json()
                 except Exception:
                     data = {"body": res.text[:400], "http_status": res.status_code}
-                # Nested status shapes differ; normalize common paths
-                status_raw = ""
-                if isinstance(data, dict):
-                    txn = data.get("data") or data.get("transaction") or {}
-                    if isinstance(txn, dict):
-                        status_raw = str(
-                            txn.get("status") or txn.get("transaction_status") or ""
-                        ).upper()
-                    if not status_raw:
-                        status_raw = str(data.get("status") or "").upper()
-                if status_raw in {"SUCCESS", "SUCCESSFUL", "TS", "TIP"}:
-                    status = "SUCCESS"
-                elif status_raw in {"FAILED", "FAILURE", "TF"}:
-                    status = "FAILED"
-                else:
-                    status = "PENDING"
+                status = ac.parse_transaction_status(data)
                 return PaymentInitResult(
                     provider_reference=reference, status=status, raw=data
                 )

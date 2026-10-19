@@ -32,7 +32,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
     if (ServerConfig.needsSetup) {
       context.go('/server-setup');
       return;
@@ -51,7 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 msg.contains('timed out') ||
                 msg.contains('Cannot reach')
             ? 'Cannot reach the server. Open Wamu server and scan the QR or paste your Wamu URL.'
-            : 'Could not send code: $e';
+            : 'Could not send code. Check your number and try again.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(hint), duration: const Duration(seconds: 8)),
         );

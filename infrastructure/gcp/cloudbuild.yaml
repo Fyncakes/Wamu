@@ -1,0 +1,45 @@
+# Build + push API image, then deploy Cloud Run (API).
+# From repo root:
+#   gcloud builds submit --config infrastructure/gcp/cloudbuild.yaml \
+#     --substitutions=_REGION=europe-west1,_SERVICE=wamu-api
+#
+# Requires Artifact Registry repo `wamu` (created by setup.sh).
+
+substitutions:
+  _REGION: europe-west1
+  _SERVICE: wamu-api
+  _AR_REPO: wamu
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:latest
+      - wamu-backend
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/api:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

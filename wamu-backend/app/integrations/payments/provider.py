@@ -178,27 +178,34 @@ class MTNAdapter(PaymentProvider):
                 "MTN MoMo credentials missing — set MTN_SUBSCRIPTION_KEY, "
                 "MTN_API_USER, MTN_API_KEY (or enable PAYMENT_MOCK_AUTO_SUCCESS for demos)"
             )
-        # Request-to-pay shape; sandbox URLs vary by environment
-        external_id = f"MTN-{reference}-{uuid.uuid4().hex[:8]}"
+        # Docs: X-Reference-Id must be UUID v4 (resource id for GET /requesttopay/{id}).
+        # Keep Wamu order id in externalId / payeeNote for reconciliation.
+        # Sandbox wallet uses EUR; production Uganda uses UGX.
+        momo_currency = (
+            "EUR" if settings.mtn_target_environment.lower() == "sandbox" else (currency or "UGX")
+        )
+        resource_id = str(uuid.uuid4())
+        external_id = f"WAMU-{reference}"[:64]
         payload = {
             "amount": str(amount),
-            "currency": currency,
+            "currency": momo_currency,
             "externalId": external_id,
             "payer": {"partyIdType": "MSISDN", "partyId": (phone or "").lstrip("+")},
             "payerMessage": "Wamu payment",
             "payeeNote": reference,
         }
         headers = {
-            "X-Reference-Id": external_id,
+            "X-Reference-Id": resource_id,
             "X-Target-Environment": settings.mtn_target_environment,
             "Ocp-Apim-Subscription-Key": settings.mtn_subscription_key,
             "Content-Type": "application/json",
         }
-        # Token + requesttopay — full OAuth is environment-specific; staging hook:
+        pub = (settings.public_api_base or "").rstrip("/")
+        if pub and not pub.startswith("http://127.") and not pub.startswith("http://localhost"):
+            headers["X-Callback-Url"] = f"{pub}/api/v1/payments/webhooks/MTN"
         url = f"{settings.mtn_base_url.rstrip('/')}/collection/v1_0/requesttopay"
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                # Basic auth token endpoint when credentials present
                 token_url = f"{settings.mtn_base_url.rstrip('/')}/collection/token/"
                 token_res = await client.post(
                     token_url,
@@ -208,25 +215,29 @@ class MTNAdapter(PaymentProvider):
                 if token_res.status_code >= 400:
                     logger.warning("MTN token failed %s %s", token_res.status_code, token_res.text[:200])
                     return PaymentInitResult(
-                        provider_reference=external_id,
+                        provider_reference=resource_id,
                         status="PENDING",
                         raw={"token_error": token_res.status_code, "body": token_res.text[:500]},
                     )
                 access = token_res.json().get("access_token")
                 headers["Authorization"] = f"Bearer {access}"
                 res = await client.post(url, json=payload, headers=headers)
-                logger.info("MTN requesttopay %s → %s", external_id, res.status_code)
+                logger.info("MTN requesttopay %s → %s", resource_id, res.status_code)
                 return PaymentInitResult(
-                    provider_reference=external_id,
+                    provider_reference=resource_id,
                     status="PENDING" if res.status_code in (200, 202) else "FAILED",
-                    raw={"http_status": res.status_code, "body": res.text[:800]},
+                    raw={
+                        "http_status": res.status_code,
+                        "body": res.text[:800],
+                        "externalId": external_id,
+                    },
                 )
         except httpx.HTTPError as exc:
             logger.exception("MTN initiate failed")
             return PaymentInitResult(
-                provider_reference=external_id,
+                provider_reference=resource_id,
                 status="PENDING",
-                raw={"error": str(exc)},
+                raw={"error": str(exc), "externalId": external_id},
             )
 
     async def check_status(self, reference: str) -> PaymentInitResult:
@@ -345,16 +356,18 @@ class MTNAdapter(PaymentProvider):
 
 class AirtelAdapter(PaymentProvider):
     """
-    Airtel Money collection (Uganda).
+    Airtel Money collection (Uganda) — USSD push via Collection APIs v2.
 
-    Staging: set AIRTEL_CLIENT_ID + AIRTEL_CLIENT_SECRET + AIRTEL_BASE_URL.
+    Staging: AIRTEL_CLIENT_ID + AIRTEL_CLIENT_SECRET + AIRTEL_BASE_URL.
+    Portal: https://developers.airtel.africa (UG → Collection-APIs).
     """
 
     name = "AIRTEL"
 
     def _configured(self) -> bool:
-        s = get_settings()
-        return bool(s.airtel_client_id and s.airtel_client_secret)
+        from app.integrations.payments.airtel_common import airtel_configured
+
+        return airtel_configured(get_settings())
 
     async def initiate_payment(
         self,
@@ -364,111 +377,137 @@ class AirtelAdapter(PaymentProvider):
         reference: str,
         phone: str | None,
     ) -> PaymentInitResult:
+        from app.integrations.payments import airtel_common as ac
+
         settings = get_settings()
         if not self._configured():
             raise RuntimeError(
                 "Airtel Money credentials missing — set AIRTEL_CLIENT_ID, "
                 "AIRTEL_CLIENT_SECRET (or enable PAYMENT_MOCK_AUTO_SUCCESS for demos)"
             )
-        external_id = f"AIRTEL-{reference}-{uuid.uuid4().hex[:8]}"
+        country, cur = ac.country_currency(settings)
+        cur = (currency or cur or "UGX").upper()
+        txn_id = ac.new_transaction_id()
+        msisdn = ac.normalize_msisdn(phone)
+        if not msisdn:
+            raise RuntimeError("Airtel collection requires a Uganda MSISDN")
         payload = {
-            "reference": external_id,
-            "subscriber": {"country": "UG", "currency": currency, "msisdn": (phone or "").lstrip("+")},
-            "transaction": {"amount": float(amount), "country": "UG", "currency": currency, "id": external_id},
+            "reference": f"Wamu {reference}"[:25],
+            "subscriber": {
+                "country": country,
+                "currency": cur,
+                "msisdn": msisdn,
+            },
+            "transaction": {
+                "amount": int(amount),
+                "country": country,
+                "currency": cur,
+                "id": txn_id,
+            },
         }
-        url = f"{settings.airtel_base_url.rstrip('/')}/merchant/v1/payments/"
+        # Prefer v2 (signed); fall back to unsigned v1 if signing unavailable.
+        use_sign = bool(getattr(settings, "airtel_sign_collections", True))
+        url_v2 = f"{settings.airtel_base_url.rstrip('/')}/merchant/v2/payments/"
+        url_v1 = f"{settings.airtel_base_url.rstrip('/')}/merchant/v1/payments/"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                # OAuth token
-                token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
-                token_res = await client.post(
-                    token_url,
-                    data={
-                        "client_id": settings.airtel_client_id,
-                        "client_secret": settings.airtel_client_secret,
-                        "grant_type": "client_credentials",
-                    },
-                )
-                if token_res.status_code >= 400:
+            async with httpx.AsyncClient(timeout=25.0) as client:
+                access, token_err = await ac.fetch_access_token(client, settings)
+                if not access:
                     return PaymentInitResult(
-                        provider_reference=external_id,
-                        status="PENDING",
-                        raw={"token_error": token_res.status_code, "body": token_res.text[:500]},
+                        provider_reference=txn_id,
+                        status="FAILED",
+                        raw=token_err,
                     )
-                access = token_res.json().get("access_token")
-                res = await client.post(
-                    url,
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {access}",
-                        "Content-Type": "application/json",
-                        "X-Country": "UG",
-                        "X-Currency": currency,
-                    },
-                )
-                logger.info("Airtel payment %s → %s", external_id, res.status_code)
+                headers = {
+                    "Authorization": f"Bearer {access}",
+                    "Content-Type": "application/json",
+                    "Accept": "*/*",
+                    "X-Country": country,
+                    "X-Currency": cur,
+                }
+                body: str | None = None
+                url = url_v2
+                if use_sign:
+                    pub, key_err = await ac.fetch_encryption_key(
+                        client, settings, access
+                    )
+                    if pub:
+                        try:
+                            signed = ac.sign_payload(pub, payload)
+                            headers["x-signature"] = signed.x_signature
+                            headers["x-key"] = signed.x_key
+                            body = signed.payload
+                        except Exception as exc:
+                            logger.warning(
+                                "Airtel collection signing failed — unsigned v1: %s",
+                                exc,
+                            )
+                            url = url_v1
+                    else:
+                        logger.warning(
+                            "Airtel encryption key unavailable — unsigned v1: %s",
+                            key_err,
+                        )
+                        url = url_v1
+                else:
+                    url = url_v1
+
+                if body is not None:
+                    res = await client.post(url, content=body.encode("utf-8"), headers=headers)
+                else:
+                    res = await client.post(url, json=payload, headers=headers)
+                try:
+                    data = res.json()
+                except Exception:
+                    data = {"body": res.text[:800]}
+                logger.info("Airtel collection %s → %s", txn_id, res.status_code)
+                ok = ac.collection_accepted(res.status_code, data)
                 return PaymentInitResult(
-                    provider_reference=external_id,
-                    status="PENDING" if res.status_code < 300 else "FAILED",
-                    raw={"http_status": res.status_code, "body": res.text[:800]},
+                    provider_reference=txn_id,
+                    status="PENDING" if ok else "FAILED",
+                    raw={"http_status": res.status_code, "response": data, "url": url},
                 )
         except httpx.HTTPError as exc:
             logger.exception("Airtel initiate failed")
             return PaymentInitResult(
-                provider_reference=external_id,
+                provider_reference=txn_id,
                 status="PENDING",
                 raw={"error": str(exc)},
             )
 
     async def check_status(self, reference: str) -> PaymentInitResult:
+        from app.integrations.payments import airtel_common as ac
+
         settings = get_settings()
         if not self._configured():
             return PaymentInitResult(provider_reference=reference, status="PENDING", raw={})
-        # Airtel enquiry by transaction id
-        url = f"{settings.airtel_base_url.rstrip('/')}/standard/v1/payments/{reference}"
+        country, cur = ac.country_currency(settings)
+        url = (
+            f"{settings.airtel_base_url.rstrip('/')}/standard/v1/payments/{reference}"
+        )
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
-                token_res = await client.post(
-                    token_url,
-                    data={
-                        "client_id": settings.airtel_client_id,
-                        "client_secret": settings.airtel_client_secret,
-                        "grant_type": "client_credentials",
-                    },
-                )
-                if token_res.status_code >= 400:
+                access, token_err = await ac.fetch_access_token(client, settings)
+                if not access:
                     return PaymentInitResult(
                         provider_reference=reference,
                         status="PENDING",
-                        raw={"token_error": token_res.status_code},
+                        raw=token_err,
                     )
-                access = token_res.json().get("access_token")
                 res = await client.get(
                     url,
                     headers={
                         "Authorization": f"Bearer {access}",
-                        "X-Country": "UG",
-                        "X-Currency": "UGX",
+                        "Accept": "*/*",
+                        "X-Country": country,
+                        "X-Currency": cur,
                     },
                 )
                 try:
                     data = res.json()
                 except Exception:
                     data = {"body": res.text[:400]}
-                # Nested status varies by Airtel API version
-                status_raw = str(
-                    data.get("status")
-                    or (data.get("data") or {}).get("transaction", {}).get("status")
-                    or (data.get("data") or {}).get("status")
-                    or ""
-                ).upper()
-                if status_raw in {"TS", "SUCCESS", "SUCCESSFUL", "TIP"}:
-                    status = "SUCCESS"
-                elif status_raw in {"TF", "FAILED", "FAILURE"}:
-                    status = "FAILED"
-                else:
-                    status = "PENDING"
+                status = ac.parse_transaction_status(data)
                 return PaymentInitResult(
                     provider_reference=reference, status=status, raw=data
                 )
@@ -484,33 +523,25 @@ class AirtelAdapter(PaymentProvider):
         amount: Decimal | None = None,
         currency: str = "UGX",
     ) -> PaymentInitResult:
-        """Best-effort Airtel reverse / refund enquiry path."""
+        """Airtel full/partial refund against an airtel_money_id."""
+        from app.integrations.payments import airtel_common as ac
+
         settings = get_settings()
         if not self._configured():
             raise RuntimeError("Airtel credentials missing for refund")
-        external_id = f"AIRTEL-REFUND-{uuid.uuid4().hex[:12]}"
+        country, cur = ac.country_currency(settings)
+        cur = (currency or cur or "UGX").upper()
+        external_id = ac.new_transaction_id()
         url = f"{settings.airtel_base_url.rstrip('/')}/standard/v1/payments/refund"
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                token_url = f"{settings.airtel_base_url.rstrip('/')}/auth/oauth2/token"
-                token_res = await client.post(
-                    token_url,
-                    data={
-                        "client_id": settings.airtel_client_id,
-                        "client_secret": settings.airtel_client_secret,
-                        "grant_type": "client_credentials",
-                    },
-                )
-                if token_res.status_code >= 400:
+                access, token_err = await ac.fetch_access_token(client, settings)
+                if not access:
                     return PaymentInitResult(
                         provider_reference=external_id,
                         status="FAILED",
-                        raw={
-                            "token_error": token_res.status_code,
-                            "body": token_res.text[:500],
-                        },
+                        raw=token_err,
                     )
-                access = token_res.json().get("access_token")
                 body: dict = {
                     "transaction": {
                         "airtel_money_id": reference,
@@ -525,8 +556,9 @@ class AirtelAdapter(PaymentProvider):
                     headers={
                         "Authorization": f"Bearer {access}",
                         "Content-Type": "application/json",
-                        "X-Country": "UG",
-                        "X-Currency": currency or "UGX",
+                        "Accept": "*/*",
+                        "X-Country": country,
+                        "X-Currency": cur,
                     },
                 )
                 logger.info("Airtel refund %s → %s", external_id, res.status_code)

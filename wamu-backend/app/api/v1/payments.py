@@ -70,7 +70,7 @@ async def confirm_payment_otp(
     return await payment_service.confirm_payment_otp(db, payment_id, user, body.code)
 
 
-@router.post("/webhooks/{provider}")
+@router.api_route("/webhooks/{provider}", methods=["POST", "PUT"])
 async def webhook(
     provider: str,
     request: Request,
@@ -81,6 +81,9 @@ async def webhook(
     - MOCK: `X-Wamu-Signature: sha256=<hmac>`
     - MTN: `X-MTN-Signature` or `X-Callback-Signature`
     - AIRTEL: `X-Airtel-Signature`
+
+    MTN MoMo docs: Wallet Platform delivers callbacks with PUT (also allow POST).
+    Callback is sent once — we still poll GET /requesttopay/{id} as fallback.
 
     Never trust a client `payment.success` flag — status comes only from verified
     webhooks or the payment provider adapter response.

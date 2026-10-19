@@ -98,12 +98,17 @@ class Settings(BaseSettings):
     mtn_disbursement_subscription_key: str = ""
     mtn_disbursement_api_user: str = ""
     mtn_disbursement_api_key: str = ""
-    # Airtel Money
+    # Airtel Money (Uganda OpenAPI — developers.airtel.africa → Uganda)
     airtel_client_id: str = ""
     airtel_client_secret: str = ""
     airtel_webhook_secret: str = ""
+    # Pan-African UAT; Uganda-specific alt: https://openapiuat.airtel.ug
     airtel_base_url: str = "https://openapiuat.airtel.africa"
-    # Encrypted PIN required by Airtel B2C disbursement (leave empty until issued)
+    airtel_country: str = "UG"
+    airtel_currency: str = "UGX"
+    # Sign collection v2 payloads (x-signature / x-key). Disable only for legacy UAT.
+    airtel_sign_collections: bool = True
+    # Plain PIN from portal — we RSA-encrypt before B2C disbursement
     airtel_disbursement_pin: str = ""
     # Platform commission withdrawal destination (owner MoMo)
     owner_payout_phone: str = ""

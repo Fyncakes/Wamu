@@ -10,10 +10,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x /app/scripts/entrypoint.sh
+RUN chmod +x /app/scripts/entrypoint.sh /app/scripts/entrypoint_celery.sh
 
 ENV PYTHONPATH=/app
-EXPOSE 8000
+# Cloud Run sets PORT (often 8080); local compose uses 8000
+EXPOSE 8000 8080
 
 # Migrate (Alembic) → seed → serve
 CMD ["/app/scripts/entrypoint.sh"]

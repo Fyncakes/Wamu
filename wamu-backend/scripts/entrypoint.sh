@@ -36,5 +36,7 @@ python -m alembic upgrade head
 echo "[wamu] bootstrap seed…"
 python -m scripts.bootstrap
 
-echo "[wamu] starting uvicorn…"
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Cloud Run sets PORT (often 8080); local/Docker default 8000
+PORT="${PORT:-8000}"
+echo "[wamu] starting uvicorn on 0.0.0.0:${PORT}…"
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
