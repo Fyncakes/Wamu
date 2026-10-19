@@ -395,6 +395,18 @@ class _SalesTrendChart extends StatelessWidget {
 
   final List<Map<String, dynamic>> points;
 
+  /// Distinct bar colors for dark messenger UI (cycles by day index).
+  static const _barPalette = <Color>[
+    Color(0xFF1DAA61), // Wamu green
+    Color(0xFF3B82F6), // blue
+    Color(0xFFF59E0B), // amber
+    Color(0xFFEC4899), // pink
+    Color(0xFF8B5CF6), // violet
+    Color(0xFF14B8A6), // teal
+    Color(0xFFEF4444), // red
+    Color(0xFF84CC16), // lime
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -427,19 +439,20 @@ class _SalesTrendChart extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              for (final p in show) ...[
+              for (var i = 0; i < show.length; i++) ...[
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: FractionallySizedBox(
                       heightFactor: maxV <= 0
                           ? 0.05
-                          : (((p['sales_minor'] as num?)?.toDouble() ?? 0) / maxV)
+                          : (((show[i]['sales_minor'] as num?)?.toDouble() ?? 0) /
+                                  maxV)
                               .clamp(0.05, 1.0),
                       alignment: Alignment.bottomCenter,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: AppTheme.accentGreen,
+                          color: _barPalette[i % _barPalette.length],
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
