@@ -53,6 +53,8 @@ import '../../shared/widgets/main_tab_swipe.dart';
 
 /// Shell: Videos | Chats | Shops | Orders | You
 final appRouterProvider = Provider<GoRouter>((ref) {
+  // Bind tour completion to the signed-in user id (new numbers still see the tour).
+  ref.watch(tutorialAuthBinderProvider);
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: _RouterRefreshListenable(ref),

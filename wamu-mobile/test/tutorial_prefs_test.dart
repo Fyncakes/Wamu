@@ -9,21 +9,30 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('first launch needs tutorial', () async {
+  test('new user id needs tutorial', () async {
     final c = TutorialController();
-    await c.load();
+    await c.syncForUser('user-a');
     expect(c.status, TutorialStatus.needed);
   });
 
-  test('markCompleted persists and does not reappear as needed', () async {
+  test('completion is per user — other numbers still see the tour', () async {
     final c = TutorialController();
-    await c.load();
-    expect(c.status, TutorialStatus.needed);
+    await c.syncForUser('user-a');
     await c.markCompleted();
     expect(c.status, TutorialStatus.completed);
 
-    final again = TutorialController();
-    await again.load();
-    expect(again.status, TutorialStatus.completed);
+    await c.syncForUser('user-b');
+    expect(c.status, TutorialStatus.needed);
+
+    await c.syncForUser('user-a');
+    expect(c.status, TutorialStatus.completed);
+  });
+
+  test('clearSession resets until the next sync', () async {
+    final c = TutorialController();
+    await c.syncForUser('user-a');
+    await c.markCompleted();
+    c.clearSession();
+    expect(c.status, TutorialStatus.unknown);
   });
 }
