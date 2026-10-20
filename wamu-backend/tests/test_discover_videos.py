@@ -139,6 +139,7 @@ async def test_create_list_like_view_follow(env):
             "video_url": "https://example.com/rolex.mp4",
             "poster_url": "https://example.com/rolex.jpg",
             "tags": "food,kampala",
+            "duration_seconds": 75,
         },
     )
     assert create.status_code == 201, create.text

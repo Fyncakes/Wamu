@@ -16,6 +16,7 @@ import '../../features/business_owner/business_dashboard_screens.dart';
 import '../../features/business_owner/business_owner_screen.dart';
 import '../../features/business_owner/manage_videos_screen.dart';
 import '../../features/business_owner/merchant_dashboard_screen.dart';
+import '../../features/business_owner/merchant_kyc_screen.dart';
 import '../../features/business_owner/payout_settings_screen.dart';
 import '../../features/businesses/business_detail_screen.dart';
 import '../../features/calls/calls_screen.dart';
@@ -202,6 +203,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/business-owner', builder: (_, __) => const BusinessOwnerScreen()),
       GoRoute(path: '/business-owner/create', builder: (_, __) => const CreateBusinessScreen()),
+      GoRoute(
+        path: '/business-owner/kyc',
+        builder: (context, state) {
+          final extra = state.extra;
+          String? id;
+          String? name;
+          if (extra is Map) {
+            id = extra['businessId']?.toString();
+            name = extra['businessName']?.toString();
+          }
+          id ??= state.uri.queryParameters['id'];
+          if (id == null || id.isEmpty) {
+            return const Scaffold(body: Center(child: Text('Missing business')));
+          }
+          return MerchantKycScreen(businessId: id, businessName: name);
+        },
+      ),
       GoRoute(path: '/business-owner/products', builder: (_, __) => const ManageProductsScreen()),
       GoRoute(path: '/business-owner/orders', builder: (_, __) => const ManageOrdersScreen()),
       GoRoute(path: '/business-owner/reviews', builder: (_, __) => const ManageReviewsScreen()),

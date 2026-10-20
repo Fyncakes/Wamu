@@ -76,5 +76,6 @@ Then:
 
 ## Compliance
 
-BoU / AML / KYC and MoMo business onboarding remain **outside** this codebase.
+BoU / AML filing and MoMo **business onboarding** remain outside this codebase.
+In-app merchant KYC (NIN + docs) is ready but **off by default** — see `documentation/MERCHANT_KYC.md`.
 Do not enable wallet custody — float stays at the licensed provider.

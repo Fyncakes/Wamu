@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,6 +13,21 @@ from app.services import business as business_service
 from app.services import payout as payout_service
 
 router = APIRouter()
+
+
+class MerchantKycRegisterBody(BaseModel):
+    owner_full_name: str = Field(min_length=2, max_length=120)
+    owner_nin: str | None = Field(default=None, max_length=40)
+    owner_date_of_birth: str | None = None
+    tin: str | None = Field(default=None, max_length=40)
+
+
+class MerchantDocumentUpload(BaseModel):
+    doc_type: str = Field(min_length=3, max_length=40)
+    url: str = Field(min_length=3)
+    object_key: str | None = None
+    mime_type: str | None = None
+    meta: dict | None = None
 
 
 @router.get("", response_model=list[BusinessResponse])
@@ -64,6 +80,70 @@ async def list_business_payouts(
 ):
     """Owner/admin: MoMo disbursements for this business (non-custodial)."""
     return await payout_service.list_business_payouts(db, user, business_id)
+
+
+@router.post("/{business_id}/kyc/register")
+async def register_merchant_kyc(
+    business_id: UUID,
+    body: MerchantKycRegisterBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Owner identity for shop KYC (can collect now; enforcement is policy-gated)."""
+    from app.services import merchant_verification as mv
+
+    return await mv.register_owner_identity(
+        db,
+        user,
+        business_id,
+        owner_full_name=body.owner_full_name,
+        owner_nin=body.owner_nin,
+        owner_date_of_birth=body.owner_date_of_birth,
+        tin=body.tin,
+    )
+
+
+@router.post("/{business_id}/kyc/documents")
+async def upload_merchant_kyc_document(
+    business_id: UUID,
+    body: MerchantDocumentUpload,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import merchant_verification as mv
+
+    return await mv.upsert_document(
+        db,
+        user,
+        business_id,
+        doc_type=body.doc_type,
+        url=body.url,
+        object_key=body.object_key,
+        mime_type=body.mime_type,
+        meta=body.meta,
+    )
+
+
+@router.post("/{business_id}/kyc/submit")
+async def submit_merchant_kyc(
+    business_id: UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import merchant_verification as mv
+
+    return await mv.submit_for_verification(db, user, business_id)
+
+
+@router.get("/{business_id}/kyc")
+async def get_merchant_kyc(
+    business_id: UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import merchant_verification as mv
+
+    return await mv.get_my_verification(db, user, business_id)
 
 
 @router.get("/{business_id}", response_model=BusinessResponse)

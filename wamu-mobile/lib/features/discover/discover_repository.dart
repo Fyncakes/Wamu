@@ -8,8 +8,17 @@ class DiscoverRepository {
 
   final ApiClient _client;
 
-  Future<List<DiscoverVideoModel>> getVideos({int limit = 30}) async {
-    final response = await _client.get('/discover/videos', queryParameters: {'limit': limit});
+  Future<List<DiscoverVideoModel>> getVideos({
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final response = await _client.get(
+      '/discover/videos',
+      queryParameters: {
+        'limit': limit,
+        if (offset > 0) 'offset': offset,
+      },
+    );
     final data = response.data;
     final list = data is List
         ? data
@@ -68,6 +77,7 @@ class DiscoverRepository {
     String? tags,
     String? productId,
     int? fileSizeBytes,
+    int? durationSeconds,
   }) async {
     final response = await _client.post('/discover/videos', data: {
       'business_id': businessId,
@@ -79,6 +89,7 @@ class DiscoverRepository {
       if (tags != null && tags.isNotEmpty) 'tags': tags,
       if (productId != null && productId.isNotEmpty) 'product_id': productId,
       if (fileSizeBytes != null && fileSizeBytes > 0) 'file_size_bytes': fileSizeBytes,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
     });
     return DiscoverVideoModel.fromJson(response.data as Map<String, dynamic>);
   }

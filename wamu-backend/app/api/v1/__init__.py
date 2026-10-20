@@ -11,6 +11,7 @@ from app.api.v1 import (
     categories,
     chat,
     communities,
+    config,
     dashboards,
     devices,
     discover,
@@ -58,4 +59,5 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(discover.router, prefix="/discover", tags=["discover"])
 api_router.include_router(dashboards.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(riders.router, tags=["riders"])
+api_router.include_router(config.router, prefix="/config", tags=["config"])
 api_router.include_router(health.router, tags=["health"])

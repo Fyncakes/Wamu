@@ -35,6 +35,7 @@ class BusinessOwnerScreen extends ConsumerStatefulWidget {
 class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
   String? _verification;
   String? _bizName;
+  String? _bizId;
   bool _loading = true;
   Timer? _statusPoll;
 
@@ -59,6 +60,7 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
       final response = await ref.read(apiClientProvider).get('/businesses/mine');
       final list = (response.data as List).cast<Map<String, dynamic>>();
       if (list.isNotEmpty) {
+        _bizId = list.first['id']?.toString();
         _bizName = list.first['name']?.toString();
         _verification = list.first['verification_status']?.toString();
       }
@@ -137,6 +139,18 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
             subtitle: 'Register a Kampala storefront',
             onTap: () => context.push('/business-owner/create'),
           ),
+          if (_bizId != null)
+            _OwnerTile(
+              icon: Icons.badge_outlined,
+              title: 'Shop verification (KYC)',
+              subtitle: verified
+                  ? 'Verified — update docs if asked'
+                  : 'National ID + shop photos for later compliance',
+              onTap: () => context.push(
+                '/business-owner/kyc',
+                extra: {'businessId': _bizId, 'businessName': _bizName},
+              ),
+            ),
           _OwnerTile(
             icon: Icons.inventory_2,
             title: 'Manage products',

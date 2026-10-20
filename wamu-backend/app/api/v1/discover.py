@@ -17,10 +17,11 @@ router = APIRouter()
 @router.get("/videos", response_model=list[DiscoverVideoResponse])
 async def list_discover_videos(
     limit: int = Query(default=30, ge=1, le=50),
+    offset: int = Query(default=0, ge=0, le=5000),
     user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await discover_service.list_videos(db, user, limit=limit)
+    return await discover_service.list_videos(db, user, limit=limit, offset=offset)
 
 
 @router.get("/videos/mine", response_model=list[DiscoverVideoResponse])

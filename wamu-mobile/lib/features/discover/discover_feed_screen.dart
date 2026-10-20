@@ -32,6 +32,8 @@ class DiscoverFeedScreen extends ConsumerStatefulWidget {
 
 class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
     with WidgetsBindingObserver {
+  static const _pageSize = 12;
+
   late Future<List<DiscoverVideoModel>> _future;
   List<DiscoverVideoModel> _videos = [];
   List<DiscoverVideoModel> _filtered = [];
@@ -41,6 +43,10 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
   bool _appInForeground = true;
   GoRouterDelegate? _routerDelegate;
   String _categoryFilter = 'All';
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  /// Bumps PageView keys when a single-clip feed must restart after dwell.
+  int _rotationNonce = 0;
 
   List<String> get _categories {
     final cats = <String>{};
@@ -137,10 +143,15 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
   }
 
   void _load() {
-    // Keep first fetch small — phone tunnels choke on large payloads + videos.
-    _future = ref.read(discoverRepositoryProvider).getVideos(limit: 6).then((v) {
-      // Keep spreadsheet category grouping order from API sort_order.
+    _hasMore = true;
+    _loadingMore = false;
+    // Newest-first page; keep first batch modest for phone networks.
+    _future = ref
+        .read(discoverRepositoryProvider)
+        .getVideos(limit: _pageSize, offset: 0)
+        .then((v) {
       _videos = List.of(v);
+      _hasMore = v.length >= _pageSize;
       _applyFilter(resetPage: true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _precachePosters(_filtered, _page);
@@ -152,6 +163,86 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
   void _reload() {
     _load();
     setState(() {});
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    _loadingMore = true;
+    try {
+      final more = await ref.read(discoverRepositoryProvider).getVideos(
+            limit: _pageSize,
+            offset: _videos.length,
+          );
+      if (!mounted) return;
+      if (more.isEmpty) {
+        _hasMore = false;
+        return;
+      }
+      final seen = _videos.map((v) => v.id).toSet();
+      final fresh = more.where((v) => !seen.contains(v.id)).toList();
+      if (fresh.isEmpty) {
+        _hasMore = more.length >= _pageSize;
+        return;
+      }
+      setState(() {
+        _videos.addAll(fresh);
+        _hasMore = more.length >= _pageSize;
+        _applyFilter(resetPage: false);
+      });
+      _precachePosters(_filtered, _page);
+    } catch (_) {
+      // Keep watching what we already have; retry on next near-end swipe.
+    } finally {
+      _loadingMore = false;
+    }
+  }
+
+  /// Pull newer clips to the top when the feed wraps (new merchant uploads).
+  Future<void> _refreshNewestQuietly() async {
+    try {
+      final newest = await ref
+          .read(discoverRepositoryProvider)
+          .getVideos(limit: _pageSize, offset: 0);
+      if (!mounted || newest.isEmpty) return;
+      final byId = {for (final v in _videos) v.id: v};
+      final merged = <DiscoverVideoModel>[];
+      final seen = <String>{};
+      for (final v in newest) {
+        merged.add(byId[v.id] ?? v);
+        seen.add(v.id);
+      }
+      for (final v in _videos) {
+        if (seen.add(v.id)) merged.add(v);
+      }
+      setState(() {
+        _videos = merged;
+        _applyFilter(resetPage: false);
+      });
+    } catch (_) {}
+  }
+
+  void _onAutoAdvance() {
+    if (!mounted || _filtered.isEmpty) return;
+    if (_filtered.length <= 1) {
+      unawaited(_refreshNewestQuietly());
+      setState(() => _rotationNonce++);
+      return;
+    }
+    if (_page >= _filtered.length - 3) {
+      unawaited(_loadMore());
+    }
+    final next = (_page + 1) % _filtered.length;
+    if (next == 0) {
+      unawaited(_refreshNewestQuietly());
+    }
+    if (!_pageController.hasClients) return;
+    unawaited(
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      ),
+    );
   }
 
   Future<void> _showCategoryFilter() async {
@@ -351,12 +442,15 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
                     setState(() => _page = i);
                     _precachePosters(feed, i);
                     ref.read(discoverRepositoryProvider).recordView(feed[i].id);
+                    if (i >= feed.length - 3) {
+                      unawaited(_loadMore());
+                    }
                   },
                   itemBuilder: (context, index) {
                     final video = feed[index];
                     final rawIndex = _videos.indexWhere((v) => v.id == video.id);
                     return _VideoPage(
-                      key: ValueKey('${video.id}_$_categoryFilter'),
+                      key: ValueKey('${video.id}_${_categoryFilter}_$_rotationNonce'),
                       video: video,
                       active: feedLive && index == _page,
                       // Preload exactly one ahead — never download the whole stack.
@@ -379,6 +473,7 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
                         if (video.businessId.isEmpty) return;
                         context.push('/business/${video.businessId}');
                       },
+                      onAutoAdvance: _onAutoAdvance,
                     );
                   },
                 ),
@@ -442,6 +537,7 @@ class _VideoPage extends StatefulWidget {
     required this.onLike,
     required this.onFollow,
     required this.onShop,
+    required this.onAutoAdvance,
   });
 
   final DiscoverVideoModel video;
@@ -454,6 +550,8 @@ class _VideoPage extends StatefulWidget {
   final VoidCallback onFollow;
   /// Opens this merchant's shop page (products).
   final VoidCallback onShop;
+  /// Move to the next clip when this one ends or hits the dwell cap.
+  final VoidCallback onAutoAdvance;
 
   @override
   State<_VideoPage> createState() => _VideoPageState();
@@ -461,6 +559,9 @@ class _VideoPage extends StatefulWidget {
 
 class _VideoPageState extends State<_VideoPage>
     with AutomaticKeepAliveClientMixin {
+  /// Cap how long one clip can hold the feed before rotating.
+  static const _maxDwell = Duration(seconds: 18);
+
   VideoPlayerController? _controller;
   bool _ready = false;
   bool _muted = false;
@@ -471,6 +572,8 @@ class _VideoPageState extends State<_VideoPage>
   /// Last known position — used so resume never jumps to 0.
   Duration _resumeAt = Duration.zero;
   Timer? _initDelay;
+  Timer? _dwellTimer;
+  bool _advanceFired = false;
 
   @override
   bool get wantKeepAlive => widget.active || widget.preload;
@@ -509,7 +612,9 @@ class _VideoPageState extends State<_VideoPage>
     if (oldWidget.video.id != widget.video.id) {
       _userPaused = false;
       _resumeAt = Duration.zero;
+      _advanceFired = false;
       _initDelay?.cancel();
+      _stopAdvanceWatch();
       _disposePlayer();
       if (_shouldLoad) {
         _scheduleInitPlayer(immediate: widget.active);
@@ -523,19 +628,62 @@ class _VideoPageState extends State<_VideoPage>
         if (_controller == null) {
           _scheduleInitPlayer(immediate: widget.active);
         } else if (widget.active) {
+          _advanceFired = false;
           _syncPlayback();
         } else {
           _rememberPosition();
+          _stopAdvanceWatch();
           _syncPlayback();
         }
       } else {
         // More than one away — free decoder + stop download.
         _initDelay?.cancel();
         _rememberPosition();
+        _stopAdvanceWatch();
         _disposePlayer();
         if (mounted) setState(() {});
       }
     }
+  }
+
+  void _stopAdvanceWatch() {
+    _dwellTimer?.cancel();
+    _dwellTimer = null;
+    final c = _controller;
+    if (c != null) {
+      c.removeListener(_onPlaybackTick);
+    }
+  }
+
+  void _startAdvanceWatch() {
+    _stopAdvanceWatch();
+    if (!widget.active || _userPaused || !_ready) return;
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    c.addListener(_onPlaybackTick);
+    _dwellTimer = Timer(_maxDwell, () {
+      if (!mounted || !widget.active || _userPaused) return;
+      _fireAdvance();
+    });
+  }
+
+  void _onPlaybackTick() {
+    if (!mounted || !widget.active || _userPaused || _advanceFired) return;
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final duration = c.value.duration;
+    final position = c.value.position;
+    if (duration > Duration.zero &&
+        position >= duration - const Duration(milliseconds: 350)) {
+      _fireAdvance();
+    }
+  }
+
+  void _fireAdvance() {
+    if (_advanceFired || !widget.active) return;
+    _advanceFired = true;
+    _stopAdvanceWatch();
+    widget.onAutoAdvance();
   }
 
   @override
@@ -604,7 +752,8 @@ class _VideoPageState extends State<_VideoPage>
     _controller = c;
     try {
       await c.initialize().timeout(const Duration(seconds: 60));
-      await c.setLooping(true);
+      // No infinite loop — rotate to the next clip when this one ends / dwells.
+      await c.setLooping(false);
       await c.setVolume(_muted ? 0 : 1);
       if (!mounted) return;
       setState(() {
@@ -661,10 +810,12 @@ class _VideoPageState extends State<_VideoPage>
         if (!mounted || _controller != c) return;
         if (widget.active && !_userPaused) {
           await c.play();
+          if (mounted) _startAdvanceWatch();
         }
       }());
     } else {
       _rememberPosition();
+      _stopAdvanceWatch();
       unawaited(c.pause());
       unawaited(c.setVolume(0));
     }
@@ -686,6 +837,7 @@ class _VideoPageState extends State<_VideoPage>
     if (!_userPaused) {
       _rememberPosition();
       setState(() => _userPaused = true);
+      _stopAdvanceWatch();
       unawaited(c.pause());
       unawaited(c.setVolume(0));
       return;
@@ -697,6 +849,7 @@ class _VideoPageState extends State<_VideoPage>
   void _disposePlayer() {
     _initDelay?.cancel();
     _initDelay = null;
+    _stopAdvanceWatch();
     _controller?.dispose();
     _controller = null;
     _ready = false;
@@ -705,6 +858,7 @@ class _VideoPageState extends State<_VideoPage>
   @override
   void dispose() {
     _initDelay?.cancel();
+    _stopAdvanceWatch();
     _disposePlayer();
     super.dispose();
   }

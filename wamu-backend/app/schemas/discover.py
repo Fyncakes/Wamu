@@ -44,6 +44,12 @@ class VideoCreate(BaseModel):
     tags: str | None = None
     product_id: UUID | None = None
     file_size_bytes: int | None = Field(default=None, ge=0)
+    duration_seconds: int | None = Field(
+        default=None,
+        ge=1,
+        le=90,
+        description="Clip length in seconds (Discover shorts: max 1.5 minutes)",
+    )
 
 
 class VideoRetentionSettings(BaseModel):

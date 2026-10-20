@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.config import get_settings
 from app.models.business import Business
 from app.models.product import Product
 from app.models.user import User
@@ -43,12 +42,6 @@ def _disk_size(video_url: str | None) -> int:
         return f.stat().st_size if f.is_file() else 10**12
     except OSError:
         return 10**12
-
-
-def _effective_size(video: BusinessVideo) -> int:
-    if video.file_size_bytes and video.file_size_bytes > 0:
-        return int(video.file_size_bytes)
-    return _disk_size(video.video_url)
 
 
 async def _products_by_business(
@@ -168,9 +161,46 @@ def _backfill_sizes(videos: list[BusinessVideo]) -> None:
                 v.file_size_bytes = sz
 
 
+def _diversify_newest(videos: list[BusinessVideo], *, max_streak: int = 2) -> list[BusinessVideo]:
+    """Keep newest-first order but avoid one merchant owning a long streak.
+
+    When many shops upload at once, limited consecutive clips from the same
+    business keeps the feed fair without burying brand-new posts.
+    """
+    remaining = list(videos)
+    out: list[BusinessVideo] = []
+    streak_biz: str | None = None
+    streak = 0
+    while remaining:
+        picked_i = None
+        for i, v in enumerate(remaining):
+            bid = str(v.business_id)
+            if streak_biz == bid and streak >= max_streak:
+                continue
+            picked_i = i
+            break
+        if picked_i is None:
+            picked_i = 0
+        picked = remaining.pop(picked_i)
+        bid = str(picked.business_id)
+        if streak_biz == bid:
+            streak += 1
+        else:
+            streak_biz = bid
+            streak = 1
+        out.append(picked)
+    return out
+
+
 async def list_videos(
-    db: AsyncSession, user: User | None, *, limit: int = 30
+    db: AsyncSession,
+    user: User | None,
+    *,
+    limit: int = 30,
+    offset: int = 0,
 ) -> list[DiscoverVideoResponse]:
+    # Over-fetch a bit so URL dedupe + merchant diversity still fill `limit`.
+    fetch_n = min(max(limit * 3, limit + 20), 150)
     result = await db.execute(
         select(BusinessVideo)
         .options(selectinload(BusinessVideo.business))
@@ -179,8 +209,10 @@ async def list_videos(
             BusinessVideo.is_active.is_(True),
             BusinessVideo.status == VIDEO_STATUS_ACTIVE,
         )
-        .order_by(BusinessVideo.sort_order.asc(), BusinessVideo.created_at.desc())
-        .limit(min(limit, 50))
+        # New merchant uploads surface at the top.
+        .order_by(BusinessVideo.created_at.desc(), BusinessVideo.sort_order.asc())
+        .offset(max(offset, 0))
+        .limit(fetch_n)
     )
     videos = list(result.scalars().all())
     # Drop duplicate encodings of the same clip (seed/manifest duplicates).
@@ -193,18 +225,8 @@ async def list_videos(
         if key:
             seen_urls.add(key)
         unique.append(v)
-    videos = unique
+    videos = _diversify_newest(unique)[: min(limit, 50)]
     _backfill_sizes(videos)
-    prefer = get_settings().video_feed_prefer_under_bytes
-    # Smaller + has poster first — fastest first-play on phone tunnels.
-    videos.sort(
-        key=lambda v: (
-            0 if (v.poster_url and str(v.poster_url).strip()) else 1,
-            0 if _effective_size(v) <= prefer else 1,
-            _effective_size(v),
-            v.sort_order or 0,
-        )
-    )
     return await _enrich(db, videos, user)
 
 
@@ -239,6 +261,29 @@ async def create_video(db: AsyncSession, user: User, data: VideoCreate) -> Disco
         ):
             raise HTTPException(status_code=400, detail="Product not found for this shop")
     size = data.file_size_bytes if data.file_size_bytes else _disk_size(data.video_url)
+    from app.services.video_processing import (
+        VideoDurationError,
+        assert_short_duration,
+        media_path_from_url,
+        probe_duration_seconds,
+    )
+
+    try:
+        if data.duration_seconds is not None:
+            duration_s = assert_short_duration(float(data.duration_seconds))
+        else:
+            local = media_path_from_url(data.video_url)
+            if local is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Shorts must be at most 1.5 minutes (90 seconds). "
+                        "Upload from gallery so length can be checked."
+                    ),
+                )
+            duration_s = assert_short_duration(probe_duration_seconds(local))
+    except VideoDurationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     video = BusinessVideo(
         business_id=data.business_id,
         author_id=user.id,
@@ -251,6 +296,7 @@ async def create_video(db: AsyncSession, user: User, data: VideoCreate) -> Disco
         status=VIDEO_STATUS_ACTIVE,
         is_active=True,
         file_size_bytes=size if size and size < 10**12 else None,
+        duration_seconds=duration_s,
     )
     db.add(video)
     await db.flush()

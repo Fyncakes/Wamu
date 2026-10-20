@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,6 +13,10 @@ import '../../shared/models/product_model.dart';
 import '../../shared/widgets/wamu_network_image.dart';
 import '../discover/discover_repository.dart';
 import 'owner_products_repository.dart';
+import 'short_video_duration.dart';
+
+/// Discover shorts: any length up to 1.5 minutes.
+const int _kMaxShortSeconds = 90;
 
 /// Merchant publishes + manages short shop videos on Discover.
 class ManageVideosScreen extends ConsumerStatefulWidget {
@@ -30,6 +35,7 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
   String? _uploadedPosterUrl;
   String? _uploadedOriginalUrl;
   int? _uploadedBytes;
+  int? _uploadedDurationSeconds;
   String? _selectedProductId;
   List<ProductModel> _products = [];
   bool _loading = true;
@@ -100,10 +106,27 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
   }
 
   Future<void> _pickAndUpload() async {
-    final file = await ImagePicker().pickVideo(source: ImageSource.gallery);
+    final file = await ImagePicker().pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(seconds: _kMaxShortSeconds),
+    );
     if (file == null) return;
     setState(() => _busy = true);
     try {
+      final localSecs = kIsWeb ? null : await probeLocalVideoDurationSeconds(file.path);
+      if (localSecs != null && localSecs > _kMaxShortSeconds) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Shorts must be at most 1.5 minutes (90 seconds). '
+                'This clip is about ${localSecs}s.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
       final bytes = await file.readAsBytes();
       final form = FormData.fromMap({
         'file': MultipartFile.fromBytes(
@@ -118,6 +141,7 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
       final poster = map['poster_url']?.toString();
       final original = map['original_url']?.toString();
       final size = map['bytes'];
+      final duration = map['duration_seconds'];
       if (url == null || url.isEmpty) throw Exception('Upload returned no URL');
       if (mounted) {
         setState(() {
@@ -126,6 +150,8 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
           _uploadedOriginalUrl =
               (original != null && original.isNotEmpty) ? original : null;
           _uploadedBytes = size is int ? size : int.tryParse('$size');
+          _uploadedDurationSeconds =
+              duration is int ? duration : int.tryParse('$duration') ?? localSecs;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Video ready — add a caption and publish')),
@@ -167,6 +193,7 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
             originalVideoUrl: _uploadedOriginalUrl,
             productId: _selectedProductId,
             fileSizeBytes: _uploadedBytes,
+            durationSeconds: _uploadedDurationSeconds,
           );
       if (!mounted) return;
       _captionCtrl.clear();
@@ -174,6 +201,7 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
       _uploadedPosterUrl = null;
       _uploadedOriginalUrl = null;
       _uploadedBytes = null;
+      _uploadedDurationSeconds = null;
       _selectedProductId = null;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Published to Local videos')),
@@ -314,6 +342,13 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
           'Publish a short clip so customers can Chat to Order from Discover.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
+        const SizedBox(height: 8),
+        Text(
+          'Maximum length is 1.5 minutes (90 seconds). Shorter clips are fine; longer ones are rejected.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.black54,
+              ),
+        ),
         const SizedBox(height: 16),
         TextField(
           controller: _captionCtrl,
@@ -360,7 +395,7 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
         OutlinedButton.icon(
           onPressed: _busy ? null : _pickAndUpload,
           icon: const Icon(Icons.video_library_outlined),
-          label: const Text('Upload from gallery'),
+          label: const Text('Upload from gallery (max 1.5 min)'),
         ),
         const SizedBox(height: 16),
         FilledButton(

@@ -103,6 +103,7 @@ export interface Business {
   logo_url?: string;
   phone?: string;
   verification_status: "UNVERIFIED" | "PENDING" | "VERIFIED" | "SUSPENDED";
+  kyc_status?: string;
   rating?: number;
   review_count?: number;
   created_at?: string;

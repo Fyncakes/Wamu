@@ -2,7 +2,7 @@
 
 from app.models.audit import AuditLog
 from app.models.block import UserBlock
-from app.models.business import Business, BusinessMember, Category, Location
+from app.models.business import Business, BusinessMember, Category, Location, MerchantDocument
 from app.models.call import CallSession
 from app.models.chat import Conversation, ConversationMember, Message, MessageHide, MessageReaction
 from app.models.device import DevicePushToken

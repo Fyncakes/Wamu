@@ -238,6 +238,105 @@ async def admin_suspend(
     return BusinessResponse.model_validate(biz)
 
 
+class MerchantKycModerationBody(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+    reupload_fields: list[str] | None = None
+
+
+@router.get("/businesses/kyc-queue")
+async def admin_merchant_kyc_queue(
+    status: str | None = "QUEUE",
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = admin
+    from app.services import merchant_verification as mv
+
+    return _wrap(await mv.admin_verification_queue(db, status=status))
+
+
+@router.get("/businesses/{business_id}/kyc")
+async def admin_merchant_kyc_detail(
+    business_id: UUID,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = admin
+    from app.services import merchant_verification as mv
+
+    return await mv.admin_verification_detail(db, business_id)
+
+
+@router.post("/businesses/{business_id}/kyc/approve")
+async def admin_approve_merchant_kyc(
+    business_id: UUID,
+    body: MerchantKycModerationBody | None = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import merchant_verification as mv
+
+    return await mv.admin_moderation_action(
+        db, admin, business_id, action="APPROVE", note=(body.note if body else None)
+    )
+
+
+@router.post("/businesses/{business_id}/kyc/reject")
+async def admin_reject_merchant_kyc(
+    business_id: UUID,
+    body: MerchantKycModerationBody | None = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import merchant_verification as mv
+
+    return await mv.admin_moderation_action(
+        db, admin, business_id, action="REJECT", note=(body.note if body else None)
+    )
+
+
+@router.post("/businesses/{business_id}/kyc/request-reupload")
+async def admin_request_merchant_kyc_reupload(
+    business_id: UUID,
+    body: MerchantKycModerationBody | None = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import merchant_verification as mv
+
+    return await mv.admin_moderation_action(
+        db,
+        admin,
+        business_id,
+        action="REQUEST_REUPLOAD",
+        note=(body.note if body else None),
+        reupload_fields=(body.reupload_fields if body else None),
+    )
+
+
+@router.get("/settings/kyc")
+async def admin_get_kyc_policy(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = admin
+    from app.services import kyc_policy
+
+    return await kyc_policy.get_kyc_policy(db)
+
+
+@router.put("/settings/kyc")
+async def admin_put_kyc_policy(
+    body: dict,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = admin
+    from app.services import kyc_policy
+
+    return await kyc_policy.set_kyc_policy(db, body)
+
+
 @router.get("/orders")
 async def admin_orders(admin: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     _ = admin

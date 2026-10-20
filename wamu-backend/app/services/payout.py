@@ -207,6 +207,36 @@ async def enqueue_payout_for_payment(
         logger.warning("Payout skipped — business missing order_id=%s", order.id)
         return None
 
+    # Off by default — only blocks when kyc.merchants.require_verified_for_payout=true
+    from app.services import merchant_verification as mv
+
+    try:
+        await mv.assert_payout_allowed(db, business)
+    except Exception as exc:
+        from fastapi import HTTPException
+
+        if isinstance(exc, HTTPException) and exc.status_code == 403:
+            logger.warning(
+                "Payout deferred — shop not verified business_id=%s payment_id=%s",
+                business.id,
+                payment.id,
+            )
+            db.add(
+                AuditLog(
+                    actor_id=business.owner_id,
+                    action="PAYOUT_SKIPPED_KYC",
+                    entity_type="payment",
+                    entity_id=payment.id,
+                    metadata_json={
+                        "business_id": str(business.id),
+                        "verification_status": business.verification_status,
+                    },
+                )
+            )
+            await db.flush()
+            return None
+        raise
+
     owner = await db.get(User, business.owner_id)
     payee = resolve_payee_phone(business, owner)
     if not payee:

@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from app.core.deps import get_current_user
 from app.integrations.storage import s3
 from app.models.user import User
-from app.services.video_processing import process_uploaded_video_bytes
+from app.services.video_processing import VideoDurationError, process_uploaded_video_bytes
 
 router = APIRouter()
 
@@ -52,7 +52,12 @@ async def upload(
     if is_video:
         # Keep original briefly for audit; serve compressed progressive MP4 + poster.
         original_url, _ = s3.upload_bytes(data, content_type=content_type, folder="media/originals")
-        compressed, poster_bytes, content_type = process_uploaded_video_bytes(data)
+        try:
+            compressed, poster_bytes, content_type, duration_s = process_uploaded_video_bytes(
+                data
+            )
+        except VideoDurationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         url, key = s3.upload_bytes(compressed, content_type=content_type, folder="media")
         if poster_bytes:
             poster_url, _ = s3.upload_bytes(
@@ -67,6 +72,7 @@ async def upload(
             "original_url": original_url,
             "bytes": len(compressed),
             "original_bytes": len(data),
+            "duration_seconds": duration_s,
         }
 
     url, key = s3.upload_bytes(data, content_type=content_type, folder="media")

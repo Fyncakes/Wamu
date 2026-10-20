@@ -116,6 +116,51 @@ def _ensure_sqlite_columns(sync_conn) -> None:
     if "payout_provider" not in biz_cols:
         sync_conn.exec_driver_sql("ALTER TABLE businesses ADD COLUMN payout_provider VARCHAR(20)")
         logger.info("Added businesses.payout_provider column")
+    for col, ddl in (
+        ("kyc_status", "VARCHAR(20) DEFAULT 'DRAFT' NOT NULL"),
+        ("owner_full_name", "VARCHAR(120)"),
+        ("owner_nin", "VARCHAR(40)"),
+        ("owner_date_of_birth", "DATE"),
+        ("tin", "VARCHAR(40)"),
+        ("kyc_ai_result", "VARCHAR(20)"),
+        ("kyc_ai_checks", "TEXT"),
+        ("kyc_ai_ran_at", "DATETIME"),
+        ("kyc_admin_note", "TEXT"),
+        ("kyc_rejection_reason", "TEXT"),
+        ("kyc_reupload_fields", "TEXT"),
+        ("kyc_submitted_at", "DATETIME"),
+        ("kyc_reviewed_at", "DATETIME"),
+        ("kyc_reviewed_by_id", "VARCHAR(36)"),
+    ):
+        if col not in biz_cols:
+            sync_conn.exec_driver_sql(f"ALTER TABLE businesses ADD COLUMN {col} {ddl}")
+            logger.info("Added businesses.%s column", col)
+            biz_cols.add(col)
+
+    tables = {
+        r[0]
+        for r in sync_conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    if "merchant_documents" not in tables:
+        sync_conn.exec_driver_sql(
+            """
+            CREATE TABLE merchant_documents (
+                id VARCHAR(36) PRIMARY KEY,
+                business_id VARCHAR(36) NOT NULL,
+                doc_type VARCHAR(40) NOT NULL,
+                url TEXT NOT NULL,
+                object_key VARCHAR(255),
+                mime_type VARCHAR(80),
+                meta TEXT,
+                is_current BOOLEAN DEFAULT 1 NOT NULL,
+                created_at DATETIME,
+                updated_at DATETIME
+            )
+            """
+        )
+        logger.info("Created merchant_documents table")
 
     profile_cols = {
         r[1] for r in sync_conn.exec_driver_sql("PRAGMA table_info(user_profiles)").fetchall()

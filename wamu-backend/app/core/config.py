@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     ffmpeg_path: str = ""
     video_max_height: int = 720
     video_crf: int = 28
+    # Discover shorts: any length up to 1.5 minutes (no minimum beyond a real clip).
+    video_min_duration_seconds: int = 1
+    video_max_duration_seconds: int = 90
     # Soft defaults; Admin can override via app_settings table.
     video_archive_after_days: int = 180
     video_purge_after_days: int = 365

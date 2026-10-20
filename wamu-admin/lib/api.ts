@@ -305,6 +305,43 @@ export const api = {
     suspendBusiness: (id: string) =>
       request<Business>(`/admin/businesses/${id}/suspend`, { method: "POST" }),
 
+    getMerchantKycQueue: (status = "QUEUE") =>
+      request<{ items?: Record<string, unknown>[] } | Record<string, unknown>[]>(
+        `/admin/businesses/kyc-queue?status=${encodeURIComponent(status)}`,
+      ),
+
+    getMerchantKyc: (id: string) =>
+      request<Record<string, unknown>>(`/admin/businesses/${id}/kyc`),
+
+    approveMerchantKyc: (id: string, note?: string) =>
+      request<Record<string, unknown>>(`/admin/businesses/${id}/kyc/approve`, {
+        method: "POST",
+        body: JSON.stringify({ note: note ?? null }),
+      }),
+
+    rejectMerchantKyc: (id: string, note?: string) =>
+      request<Record<string, unknown>>(`/admin/businesses/${id}/kyc/reject`, {
+        method: "POST",
+        body: JSON.stringify({ note: note ?? "Rejected" }),
+      }),
+
+    requestMerchantKycReupload: (id: string, note?: string) =>
+      request<Record<string, unknown>>(
+        `/admin/businesses/${id}/kyc/request-reupload`,
+        {
+          method: "POST",
+          body: JSON.stringify({ note: note ?? null }),
+        },
+      ),
+
+    getKycPolicy: () => request<Record<string, unknown>>(`/admin/settings/kyc`),
+
+    setKycPolicy: (body: Record<string, unknown>) =>
+      request<Record<string, unknown>>(`/admin/settings/kyc`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+
     getOrders: (params?: { page?: number; status?: string }) => {
       const query = new URLSearchParams();
       if (params?.page) query.set("page", String(params.page));

@@ -54,7 +54,7 @@ async def create_business(db: AsyncSession, user: User, data: BusinessCreate) ->
         payout_provider=data.payout_provider,
         email=data.email,
         category_id=data.category_id,
-        verification_status=VerificationStatus.PENDING.value,
+        verification_status=VerificationStatus.UNVERIFIED.value,
         logo_url=default_logo,
         cover_url=default_cover,
     )
@@ -167,6 +167,10 @@ async def list_businesses(
         Business.status == "ACTIVE",
         media_ok,
     )
+    from app.services import kyc_policy
+
+    if await kyc_policy.require_merchant_verified_for_catalog(db):
+        stmt = stmt.where(Business.verification_status == VerificationStatus.VERIFIED.value)
     if category_id:
         stmt = stmt.where(Business.category_id == category_id)
     if q:
@@ -184,6 +188,10 @@ async def list_businesses(
             Business.status == "ACTIVE",
             media_ok,
         )
+        if await kyc_policy.require_merchant_verified_for_catalog(db):
+            count_stmt = count_stmt.where(
+                Business.verification_status == VerificationStatus.VERIFIED.value
+            )
         if category_id:
             count_stmt = count_stmt.where(Business.category_id == category_id)
         if q:

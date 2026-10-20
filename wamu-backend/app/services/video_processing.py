@@ -32,6 +32,16 @@ def ffmpeg_bin() -> str | None:
     return which
 
 
+def ffprobe_bin() -> str | None:
+    """Resolve ffprobe next to ffmpeg, or from PATH."""
+    ff = ffmpeg_bin()
+    if ff:
+        probe = Path(ff).with_name("ffprobe")
+        if probe.is_file():
+            return str(probe)
+    return shutil.which("ffprobe")
+
+
 def _run(cmd: list[str], *, timeout: int = 180) -> None:
     subprocess.run(
         cmd,
@@ -39,6 +49,64 @@ def _run(cmd: list[str], *, timeout: int = 180) -> None:
         capture_output=True,
         timeout=timeout,
     )
+
+
+def probe_duration_seconds(path: Path) -> float | None:
+    """Return media duration in seconds, or None if unreadable."""
+    probe = ffprobe_bin()
+    if not probe or not path.is_file():
+        return None
+    try:
+        out = subprocess.run(
+            [
+                probe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        raw = (out.stdout or "").strip()
+        if not raw or raw.upper() == "N/A":
+            return None
+        return float(raw)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        logger.warning("ffprobe duration failed: %s", exc)
+        return None
+
+
+class VideoDurationError(ValueError):
+    """Raised when a short is longer than the allowed maximum (1.5 minutes)."""
+
+
+def assert_short_duration(seconds: float | None) -> int:
+    """Validate Discover short length: up to max seconds (default 90). Returns whole seconds."""
+    settings = get_settings()
+    lo = int(settings.video_min_duration_seconds)
+    hi = int(settings.video_max_duration_seconds)
+    if seconds is None:
+        raise VideoDurationError(
+            f"Could not read video length. Shorts must be at most {hi} seconds (1.5 minutes)."
+        )
+    rounded = int(round(seconds))
+    if rounded < lo:
+        raise VideoDurationError(
+            f"Could not use this file as a short (about {rounded}s). "
+            f"Upload a real video clip of at most {hi} seconds (1.5 minutes)."
+        )
+    if rounded > hi:
+        raise VideoDurationError(
+            f"Shorts must be at most {hi} seconds (1.5 minutes). "
+            f"This clip is about {rounded}s."
+        )
+    return rounded
 
 
 def extract_poster(video_path: Path, poster_path: Path) -> bool:
@@ -134,29 +202,33 @@ def compress_mp4(
         return False
 
 
-def process_uploaded_video_bytes(data: bytes) -> tuple[bytes, bytes | None, str]:
+def process_uploaded_video_bytes(
+    data: bytes,
+) -> tuple[bytes, bytes | None, str, int | None]:
     """
-    Compress upload + extract poster JPEG.
-    Returns (video_bytes, poster_jpeg_or_None, mime_type).
-    Falls back to original bytes when ffmpeg is unavailable.
+    Validate short duration, compress + extract poster JPEG.
+    Returns (video_bytes, poster_jpeg_or_None, mime_type, duration_seconds).
+    Falls back to original bytes when ffmpeg is unavailable (still requires duration).
     """
-    ff = ffmpeg_bin()
-    if not ff:
-        return data, None, "video/mp4"
-
     with tempfile.TemporaryDirectory(prefix="wamu_vid_") as td:
         raw = Path(td) / "raw.bin"
         out = Path(td) / "out.mp4"
         poster = Path(td) / "poster.jpg"
         raw.write_bytes(data)
-        # Probe-less: treat as video container; ffmpeg will fail soft.
+        duration = probe_duration_seconds(raw)
+        duration_s = assert_short_duration(duration)
+
+        ff = ffmpeg_bin()
+        if not ff:
+            return data, None, "video/mp4", duration_s
+
         ok = compress_mp4(raw, out)
         video_out = out.read_bytes() if ok and out.is_file() else data
         poster_bytes = None
         src_for_poster = out if ok and out.is_file() else raw
         if extract_poster(src_for_poster, poster):
             poster_bytes = poster.read_bytes()
-        return video_out, poster_bytes, "video/mp4"
+        return video_out, poster_bytes, "video/mp4", duration_s
 
 
 def media_path_from_url(video_url: str) -> Path | None:
