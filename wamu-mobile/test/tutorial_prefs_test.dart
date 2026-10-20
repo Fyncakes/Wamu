@@ -28,11 +28,11 @@ void main() {
     expect(c.status, TutorialStatus.completed);
   });
 
-  test('clearSession resets until the next sync', () async {
+  test('clearSession is idle so splash can reach login', () async {
     final c = TutorialController();
     await c.syncForUser('user-a');
     await c.markCompleted();
     c.clearSession();
-    expect(c.status, TutorialStatus.unknown);
+    expect(c.status, TutorialStatus.completed);
   });
 }

@@ -74,8 +74,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return '/server-setup';
       }
 
-      if (auth.status == AuthStatus.unknown ||
-          tutorial.status == TutorialStatus.unknown) {
+      // Auth bootstrap only — never block login on tutorial prefs.
+      if (auth.status == AuthStatus.unknown) {
         return isSplash ? null : '/splash';
       }
       if (auth.status == AuthStatus.unauthenticated) {
@@ -86,6 +86,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
       // Allow changing PC server while logged in
       if (isServerSetup) return null;
+
+      // Wait briefly for per-user tour prefs after login (not while logged out).
+      if (tutorial.status == TutorialStatus.unknown) {
+        return isSplash ? null : '/splash';
+      }
 
       // Product tour after profile is ready — never blocks OTP / login.
       if (tutorial.status == TutorialStatus.needed && !isWelcome) {

@@ -20,11 +20,14 @@ class TutorialController extends ChangeNotifier {
     final id = (userId ?? '').trim();
     if (id.isEmpty) {
       _userId = null;
-      status = TutorialStatus.unknown;
+      status = TutorialStatus.completed;
       notifyListeners();
       return;
     }
     _userId = id;
+    // Mark loading so we don't briefly treat a prior idle/completed as "skip tour".
+    status = TutorialStatus.unknown;
+    notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       final done = prefs.getBool(_keyFor(id)) ?? false;
@@ -50,7 +53,8 @@ class TutorialController extends ChangeNotifier {
 
   void clearSession() {
     _userId = null;
-    status = TutorialStatus.unknown;
+    // Idle while logged out — must NOT stay `unknown` or splash never exits.
+    status = TutorialStatus.completed;
     notifyListeners();
   }
 }

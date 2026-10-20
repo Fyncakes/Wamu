@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -265,7 +267,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _bootstrap() async {
     try {
-      final user = await _repo.getCurrentUser();
+      // Cap splash wait — full Dio receiveTimeout is 90s and feels hung on phones.
+      final user = await _repo.getCurrentUser().timeout(const Duration(seconds: 12));
       if (user == null) {
         state = const AuthState(status: AuthStatus.unauthenticated);
         return;
@@ -275,8 +278,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: user,
       );
     } catch (_) {
-      // Network/tunnel blip with a stored token — stay unknown briefly then unauthenticated UI
-      // without wiping the token so a retry can succeed.
+      // Network/tunnel blip with a stored token — leave login UI without wiping the token.
       state = const AuthState(status: AuthStatus.unauthenticated);
     }
   }
