@@ -38,7 +38,7 @@ AFRICASTALKING_SENDER_ID=WAMU
 
 ## Local demo
 
-`PAYMENT_MOCK_AUTO_SUCCESS=true` → MTN/AIRTEL labeled mocks auto-confirm (theatre for Flutter cart).
+`PAYMENT_MOCK_AUTO_SUCCESS=true` → AIRTEL (+ MOCK) labeled mock theatre for Flutter cart; MTN always uses live `MTN_*` API.
 
 ## Staging (real adapters, no fake SUCCESS)
 

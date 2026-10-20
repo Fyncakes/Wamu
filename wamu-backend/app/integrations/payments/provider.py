@@ -95,9 +95,10 @@ class MockPaymentProvider(PaymentProvider):
 
 
 class NamedMockPaymentProvider(MockPaymentProvider):
-    """Demo MoMo theater — labeled MTN / AIRTEL / MOCK.
+    """Demo MoMo theater — labeled AIRTEL / MOCK only.
 
-    MTN/AIRTEL stay PROCESSING until the client confirms a Wamu-owned OTP
+    MTN always uses the live ``MTNAdapter`` (sandbox/production API).
+    AIRTEL stays PROCESSING until the client confirms a Wamu-owned OTP
     (see payment_momo_otp_enabled). Plain MOCK still auto-SUCCESS for tests.
     """
 
@@ -109,7 +110,7 @@ class NamedMockPaymentProvider(MockPaymentProvider):
         return (
             settings.payment_mock_auto_success
             and settings.payment_momo_otp_enabled
-            and self.name in {"MTN", "AIRTEL"}
+            and self.name == "AIRTEL"
         )
 
     async def initiate_payment(
@@ -583,8 +584,9 @@ def get_payment_provider(name: str) -> PaymentProvider:
         raise ValueError(
             "CARD payments are not supported in MVP — use MTN or AIRTEL Mobile Money"
         )
-    # Local / demo: treat MTN & Airtel as labeled mocks so checkout UI can demo both.
-    if settings.payment_mock_auto_success and key in {"MOCK", "MTN", "AIRTEL"}:
+    # Local / demo: Airtel (+ plain MOCK) is the labeled mock rail.
+    # MTN always hits MTNAdapter — sandbox/live credentials in .env.
+    if settings.payment_mock_auto_success and key in {"MOCK", "AIRTEL"}:
         return NamedMockPaymentProvider(key)
     mapping: dict[str, PaymentProvider] = {
         "MOCK": MockPaymentProvider(),

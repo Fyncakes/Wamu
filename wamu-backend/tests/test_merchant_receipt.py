@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base, get_db
 from app.core.security import hash_token
 from app.main import app
+from tests.conftest import complete_mock_momo_payment
 from app.models.business import (
     Business,
     BusinessMember,
@@ -211,10 +212,11 @@ async def test_merchant_receipt_negotiated_price_buyer_pays(env):
         headers=c_h,
         json={
             "order_id": order_id,
-            "provider": "MTN",
+            "provider": "AIRTEL",
             "idempotency_key": str(uuid4()),
             "phone": env["customer_phone"],
         },
     )
     assert pay.status_code in (200, 201), pay.text
-    assert pay.json()["status"] in ("SUCCESS", "PENDING")
+    paid = await complete_mock_momo_payment(client, c_h, pay.json())
+    assert paid["status"] in ("SUCCESS", "PENDING")

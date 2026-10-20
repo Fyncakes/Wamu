@@ -45,6 +45,40 @@ def auth(client: httpx.Client, phone: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def pay_airtel_mock(
+    client: httpx.Client,
+    headers: dict[str, str],
+    *,
+    order_id: str,
+    phone: str,
+) -> dict[str, Any]:
+    """Collect via Airtel mock rail (Wamu OTP). MTN stays on live MoMo API."""
+    pay = client.post(
+        "/api/v1/payments",
+        headers=headers,
+        json={
+            "order_id": order_id,
+            "provider": "AIRTEL",
+            "idempotency_key": str(uuid.uuid4()),
+            "phone": phone,
+        },
+    )
+    if pay.status_code not in (200, 201):
+        fail(f"pay {pay.status_code} {pay.text}")
+    body = pay.json()
+    if body.get("status") == "PROCESSING" and body.get("otp_required"):
+        code = body.get("mock_hint") or "123456"
+        ok_pay = client.post(
+            f"/api/v1/payments/{body['id']}/confirm-otp",
+            headers=headers,
+            json={"code": code},
+        )
+        if ok_pay.status_code != 200:
+            fail(f"confirm-otp {ok_pay.status_code} {ok_pay.text}")
+        body = ok_pay.json()
+    return body
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://127.0.0.1:8000")
@@ -208,19 +242,12 @@ def main() -> None:
             fail(f"approve rider {approve.status_code} {approve.text}")
         ok("rider approved by admin")
 
-        pay = client.post(
-            "/api/v1/payments",
-            headers=c_headers,
-            json={
-                "order_id": order_id,
-                "provider": "MTN",
-                "idempotency_key": str(uuid.uuid4()),
-                "phone": customer_phone,
-            },
+        pay_body = pay_airtel_mock(
+            client, c_headers, order_id=order_id, phone=customer_phone
         )
-        if pay.status_code not in (200, 201):
-            fail(f"pay {pay.status_code} {pay.text}")
-        ok(f"payment status={pay.json().get('status')}")
+        if pay_body.get("status") != "SUCCESS":
+            fail(f"payment status={pay_body.get('status')}")
+        ok(f"AIRTEL mock payment status={pay_body.get('status')}")
 
         stock_after = client.get(f"/api/v1/products/{product_id}").json().get("stock_quantity")
         if stock_after != 19:
@@ -374,20 +401,11 @@ def main() -> None:
             fail(f"paid-cancel order {paid_cancel.status_code} {paid_cancel.text}")
         pcid = paid_cancel.json()["id"]
         stock_before = client.get(f"/api/v1/products/{product_id}").json().get("stock_quantity")
-        pay2 = client.post(
-            "/api/v1/payments",
-            headers=c_headers,
-            json={
-                "order_id": pcid,
-                "provider": "AIRTEL",
-                "idempotency_key": str(uuid.uuid4()),
-                "phone": customer_phone,
-            },
+        pay2_body = pay_airtel_mock(
+            client, c_headers, order_id=pcid, phone=customer_phone
         )
-        if pay2.status_code not in (200, 201):
-            fail(f"pay2 {pay2.status_code} {pay2.text}")
-        if pay2.json().get("status") != "SUCCESS":
-            fail(f"pay2 status={pay2.json().get('status')}")
+        if pay2_body.get("status") != "SUCCESS":
+            fail(f"pay2 status={pay2_body.get('status')}")
         ok("AIRTEL payment SUCCESS (labeled mock)")
 
         m_cancel = client.patch(

@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     rate_limit_otp_per_hour: int = 5
     rate_limit_api_per_minute: int = 120
     payment_mock_auto_success: bool = True
-    # When mock MoMo is on, MTN/AIRTEL payments wait for a Wamu-owned OTP
+    # When mock MoMo is on, AIRTEL payments wait for a Wamu-owned OTP (MTN stays live)
     # (same mock code as login when OTP_MOCK_MODE=true) before SUCCESS.
     payment_momo_otp_enabled: bool = True
     # Platform commission in basis points on order **subtotal** (excl. delivery).

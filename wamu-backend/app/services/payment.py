@@ -31,11 +31,12 @@ from app.services.order import get_order
 
 
 def _momo_otp_rail(provider: str) -> bool:
+    """Wamu OTP gate applies to mock Airtel only — MTN uses the live MoMo API."""
     settings = get_settings()
     return (
         settings.payment_mock_auto_success
         and settings.payment_momo_otp_enabled
-        and (provider or "").upper() in {"MTN", "AIRTEL"}
+        and (provider or "").upper() == "AIRTEL"
     )
 
 

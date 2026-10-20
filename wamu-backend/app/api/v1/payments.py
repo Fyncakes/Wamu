@@ -55,7 +55,7 @@ async def request_payment_otp(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Resend Wamu MoMo OTP for MTN / Airtel (mock or SMS)."""
+    """Resend Wamu MoMo OTP for Airtel mock (or SMS)."""
     return await payment_service.request_payment_otp(db, payment_id, user)
 
 
@@ -66,7 +66,7 @@ async def confirm_payment_otp(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Confirm Wamu-owned MoMo OTP for MTN / Airtel payments."""
+    """Confirm Wamu-owned MoMo OTP for Airtel mock payments."""
     return await payment_service.confirm_payment_otp(db, payment_id, user, body.code)
 
 

@@ -197,14 +197,13 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                   refunds: refunds,
                 ),
                 const SizedBox(height: 22),
-                Text(
-                  'Sales trend',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                _SalesTrendChart(
+                  points: trend,
+                  period: _period,
+                  dateFrom: dash['date_from']?.toString(),
+                  dateTo: dash['date_to']?.toString(),
+                  totalSalesMinor: sales,
                 ),
-                const SizedBox(height: 8),
-                _SalesTrendChart(points: trend),
                 const SizedBox(height: 22),
                 Row(
                   children: [
@@ -390,87 +389,571 @@ class _BreakdownRow extends StatelessWidget {
   }
 }
 
-class _SalesTrendChart extends StatelessWidget {
-  const _SalesTrendChart({required this.points});
+/// Daily sales accountability chart (Shopify/Apple-style: one colour, axes,
+/// tap for exact day, plain-language summary).
+class _SalesTrendChart extends StatefulWidget {
+  const _SalesTrendChart({
+    required this.points,
+    required this.period,
+    required this.totalSalesMinor,
+    this.dateFrom,
+    this.dateTo,
+  });
 
   final List<Map<String, dynamic>> points;
+  final String period;
+  final double totalSalesMinor;
+  final String? dateFrom;
+  final String? dateTo;
 
-  /// Distinct bar colors for dark messenger UI (cycles by day index).
-  static const _barPalette = <Color>[
-    Color(0xFF1DAA61), // Wamu green
-    Color(0xFF3B82F6), // blue
-    Color(0xFFF59E0B), // amber
-    Color(0xFFEC4899), // pink
-    Color(0xFF8B5CF6), // violet
-    Color(0xFF14B8A6), // teal
-    Color(0xFFEF4444), // red
-    Color(0xFF84CC16), // lime
-  ];
+  @override
+  State<_SalesTrendChart> createState() => _SalesTrendChartState();
+}
+
+class _SalesTrendChartState extends State<_SalesTrendChart> {
+  int? _selected;
+
+  static String _compactUgx(num amount) {
+    final v = amount.abs();
+    if (v >= 1000000) {
+      final m = v / 1000000;
+      return 'UGX ${m >= 10 ? m.toStringAsFixed(0) : m.toStringAsFixed(1)}M';
+    }
+    if (v >= 1000) {
+      final k = v / 1000;
+      return 'UGX ${k >= 100 ? k.toStringAsFixed(0) : k.toStringAsFixed(1)}k';
+    }
+    return formatUgx(amount);
+  }
+
+  static DateTime? _parseDay(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return DateTime.parse(raw.split('T').first).toLocal();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _dayLabel(DateTime d, {required bool withMonth}) {
+    if (withMonth) {
+      return DateFormat('d MMM').format(d);
+    }
+    return DateFormat('d').format(d);
+  }
+
+  static String _weekdayShort(DateTime d) => DateFormat('EEE').format(d);
+
+  /// Fill every calendar day in the period (zeros included) so empty days
+  /// are visible — critical for accountability.
+  List<_TrendDay> _series() {
+    final byDay = <String, _TrendDay>{};
+    for (final p in widget.points) {
+      final period = p['period']?.toString() ?? '';
+      final day = _parseDay(period);
+      if (day == null) continue;
+      final key = DateFormat('yyyy-MM-dd').format(day);
+      byDay[key] = _TrendDay(
+        date: DateTime(day.year, day.month, day.day),
+        salesMinor: (p['sales_minor'] as num?)?.toDouble() ?? 0,
+        orders: (p['orders'] as num?)?.toInt() ?? 0,
+      );
+    }
+
+    var start = _parseDay(widget.dateFrom);
+    var end = _parseDay(widget.dateTo);
+    if (start == null || end == null) {
+      if (byDay.isEmpty) return const [];
+      final sorted = byDay.keys.toList()..sort();
+      start = DateTime.parse(sorted.first);
+      end = DateTime.parse(sorted.last);
+    }
+    start = DateTime(start.year, start.month, start.day);
+    end = DateTime(end.year, end.month, end.day);
+    if (end.isBefore(start)) return const [];
+
+    final days = <_TrendDay>[];
+    for (var d = start; !d.isAfter(end); d = d.add(const Duration(days: 1))) {
+      final key = DateFormat('yyyy-MM-dd').format(d);
+      days.add(
+        byDay[key] ??
+            _TrendDay(date: d, salesMinor: 0, orders: 0),
+      );
+    }
+
+    // Shopify: bars for < ~30 points; bucket to weeks for longer ranges.
+    if (days.length > 31) {
+      return _bucketWeeks(days);
+    }
+    return days;
+  }
+
+  List<_TrendDay> _bucketWeeks(List<_TrendDay> days) {
+    final buckets = <_TrendDay>[];
+    for (var i = 0; i < days.length; i += 7) {
+      final chunk = days.sublist(i, (i + 7).clamp(0, days.length));
+      final sales = chunk.fold<double>(0, (a, b) => a + b.salesMinor);
+      final orders = chunk.fold<int>(0, (a, b) => a + b.orders);
+      buckets.add(
+        _TrendDay(
+          date: chunk.first.date,
+          salesMinor: sales,
+          orders: orders,
+          weekEnd: chunk.last.date,
+        ),
+      );
+    }
+    return buckets;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SalesTrendChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.period != widget.period ||
+        oldWidget.points != widget.points) {
+      _selected = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (points.isEmpty) {
-      return Container(
-        height: 140,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: theme.colorScheme.surfaceContainerHighest,
-        ),
-        child: Text(
-          'No successful payments in this period yet',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppTheme.messengerMuted,
-          ),
-        ),
-      );
-    }
-    final values =
-        points.map((p) => (p['sales_minor'] as num?)?.toDouble() ?? 0).toList();
-    final maxV = values.fold<double>(0, (a, b) => a > b ? a : b);
-    final show = points.length > 14 ? points.sublist(points.length - 14) : points;
+    final series = _series();
+    final isWeekly = series.any((d) => d.weekEnd != null);
+    final periodLabel = switch (widget.period) {
+      '7d' => 'Last 7 days',
+      '90d' => 'Last 90 days',
+      _ => 'Last 30 days',
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 140,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (var i = 0; i < show.length; i++) ...[
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: FractionallySizedBox(
-                      heightFactor: maxV <= 0
-                          ? 0.05
-                          : (((show[i]['sales_minor'] as num?)?.toDouble() ?? 0) /
-                                  maxV)
-                              .clamp(0.05, 1.0),
-                      alignment: Alignment.bottomCenter,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: _barPalette[i % _barPalette.length],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+        Text(
+          isWeekly ? 'Weekly sales' : 'Daily sales',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 2),
         Text(
-          '${show.first['period']} → ${show.last['period']} · UGX',
+          isWeekly
+              ? 'Money collected each week (successful payments only)'
+              : 'Money collected each day (successful payments only)',
           style: theme.textTheme.bodySmall?.copyWith(
             color: AppTheme.messengerMuted,
           ),
         ),
+        const SizedBox(height: 10),
+        if (series.isEmpty || series.every((d) => d.salesMinor <= 0))
+          Container(
+            height: 160,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: theme.colorScheme.surfaceContainerHighest,
+            ),
+            child: Text(
+              'No successful payments in $periodLabel yet.\n'
+              'When customers pay, each ${isWeekly ? 'week' : 'day'} '
+              'will show here in UGX.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.messengerMuted,
+              ),
+            ),
+          )
+        else ...[
+          _InsightStrip(series: series, isWeekly: isWeekly),
+          const SizedBox(height: 12),
+          _LabeledBarChart(
+            series: series,
+            isWeekly: isWeekly,
+            selected: _selected,
+            onSelect: (i) => setState(() {
+              _selected = _selected == i ? null : i;
+            }),
+            compactUgx: _compactUgx,
+            dayLabel: _dayLabel,
+          ),
+          if (_selected != null &&
+              _selected! >= 0 &&
+              _selected! < series.length) ...[
+            const SizedBox(height: 10),
+            _DayDetailCard(
+              day: series[_selected!],
+              isWeekly: isWeekly,
+              weekdayShort: _weekdayShort,
+              dayLabel: _dayLabel,
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text(
+              'Tap a bar to see that ${isWeekly ? 'week' : 'day'}’s amount',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTheme.messengerMuted,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            '$periodLabel · total ${formatUgx(widget.totalSalesMinor)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppTheme.messengerMuted,
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _TrendDay {
+  const _TrendDay({
+    required this.date,
+    required this.salesMinor,
+    required this.orders,
+    this.weekEnd,
+  });
+
+  final DateTime date;
+  final double salesMinor;
+  final int orders;
+  final DateTime? weekEnd;
+}
+
+class _InsightStrip extends StatelessWidget {
+  const _InsightStrip({required this.series, required this.isWeekly});
+
+  final List<_TrendDay> series;
+  final bool isWeekly;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final withSales = series.where((d) => d.salesMinor > 0).toList();
+    if (withSales.isEmpty) return const SizedBox.shrink();
+
+    _TrendDay best = withSales.first;
+    for (final d in withSales) {
+      if (d.salesMinor > best.salesMinor) best = d;
+    }
+    final total =
+        series.fold<double>(0, (a, b) => a + b.salesMinor);
+    final avg = total / series.length;
+    final active = withSales.length;
+
+    String bestLabel;
+    if (isWeekly && best.weekEnd != null) {
+      bestLabel =
+          '${DateFormat('d MMM').format(best.date)}–${DateFormat('d MMM').format(best.weekEnd!)}';
+    } else {
+      bestLabel = DateFormat('EEE d MMM').format(best.date);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        children: [
+          _insightRow(
+            theme,
+            'Best ${isWeekly ? 'week' : 'day'}',
+            '$bestLabel · ${formatUgx(best.salesMinor)}',
+          ),
+          _insightRow(
+            theme,
+            'Average / ${isWeekly ? 'week' : 'day'}',
+            formatUgx(avg),
+          ),
+          _insightRow(
+            theme,
+            isWeekly ? 'Weeks with sales' : 'Days with sales',
+            '$active of ${series.length}',
+            last: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _insightRow(ThemeData theme, String k, String v, {bool last = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: last ? 0 : 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 118,
+            child: Text(k, style: theme.textTheme.bodySmall),
+          ),
+          Expanded(
+            child: Text(
+              v,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LabeledBarChart extends StatelessWidget {
+  const _LabeledBarChart({
+    required this.series,
+    required this.isWeekly,
+    required this.selected,
+    required this.onSelect,
+    required this.compactUgx,
+    required this.dayLabel,
+  });
+
+  final List<_TrendDay> series;
+  final bool isWeekly;
+  final int? selected;
+  final ValueChanged<int> onSelect;
+  final String Function(num) compactUgx;
+  final String Function(DateTime, {required bool withMonth}) dayLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final maxV =
+        series.fold<double>(0, (a, b) => a > b.salesMinor ? a : b.salesMinor);
+    final midV = maxV / 2;
+    // Label every nth tick so X-axis stays readable on mobile.
+    final labelEvery = series.length <= 7
+        ? 1
+        : series.length <= 14
+            ? 2
+            : series.length <= 21
+                ? 3
+                : 5;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 12, 8, 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceContainerHighest,
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 168,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Y-axis (Shopify: labels outside the data area)
+                SizedBox(
+                  width: 52,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        compactUgx(maxV),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppTheme.messengerMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                      Text(
+                        compactUgx(midV),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppTheme.messengerMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                      Text(
+                        '0',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppTheme.messengerMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(3, (_) {
+                            return Container(
+                              height: 1,
+                              color: theme.dividerColor.withValues(alpha: 0.35),
+                            );
+                          }),
+                        ),
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          for (var i = 0; i < series.length; i++)
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onSelect(i),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: series.length > 20 ? 1 : 2.5,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: FractionallySizedBox(
+                                      heightFactor: maxV <= 0
+                                          ? 0
+                                          : (series[i].salesMinor / maxV).clamp(
+                                              series[i].salesMinor > 0
+                                                  ? 0.04
+                                                  : 0.0,
+                                              1.0,
+                                            ),
+                                      widthFactor: 0.72,
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 180),
+                                        decoration: BoxDecoration(
+                                          color: selected == i
+                                              ? AppTheme.primaryGreen
+                                              : AppTheme.accentGreen.withValues(
+                                                  alpha: series[i].salesMinor > 0
+                                                      ? 0.9
+                                                      : 0.18,
+                                                ),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border: selected == i
+                                              ? Border.all(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.55),
+                                                  width: 1.5,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          // X-axis date labels
+          Row(
+            children: [
+              const SizedBox(width: 58),
+              Expanded(
+                child: Row(
+                  children: [
+                    for (var i = 0; i < series.length; i++)
+                      Expanded(
+                        child: (i % labelEvery == 0 || i == series.length - 1)
+                            ? Text(
+                                dayLabel(
+                                  series[i].date,
+                                  withMonth: series.length <= 10 ||
+                                      i == 0 ||
+                                      i == series.length - 1,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppTheme.messengerMuted,
+                                  fontSize: 9,
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayDetailCard extends StatelessWidget {
+  const _DayDetailCard({
+    required this.day,
+    required this.isWeekly,
+    required this.weekdayShort,
+    required this.dayLabel,
+  });
+
+  final _TrendDay day;
+  final bool isWeekly;
+  final String Function(DateTime) weekdayShort;
+  final String Function(DateTime, {required bool withMonth}) dayLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = isWeekly && day.weekEnd != null
+        ? '${dayLabel(day.date, withMonth: true)} – '
+            '${dayLabel(day.weekEnd!, withMonth: true)}'
+        : '${weekdayShort(day.date)}, ${dayLabel(day.date, withMonth: true)}';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.accentGreen.withValues(alpha: 0.12),
+        border: Border.all(
+          color: AppTheme.accentGreen.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.messengerMuted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formatUgx(day.salesMinor),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            day.orders == 1 ? '1 order' : '${day.orders} orders',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

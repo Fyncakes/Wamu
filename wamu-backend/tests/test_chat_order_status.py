@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base, get_db
 from app.core.security import hash_token
 from app.main import app
+from tests.conftest import complete_mock_momo_payment
 from app.models.business import (
     Business,
     BusinessMember,
@@ -191,13 +192,14 @@ async def test_delivery_status_posts_system_messages_in_chat(env):
         headers=ch,
         json={
             "order_id": order_id,
-            "provider": "MTN",
+            "provider": "AIRTEL",
             "idempotency_key": f"chat-pay-{uuid4().hex[:12]}",
             "phone": "+256733300002",
         },
     )
     assert pay.status_code == 201, pay.text
-    assert pay.json()["status"] == "SUCCESS"
+    paid = await complete_mock_momo_payment(client, ch, pay.json())
+    assert paid["status"] == "SUCCESS"
 
     async with env["session_factory"]() as session:
         assigned = await session.scalar(
@@ -267,12 +269,14 @@ async def test_delivery_status_posts_system_messages_in_chat(env):
         headers=ch,
         json={
             "order_id": oid2,
-            "provider": "MTN",
+            "provider": "AIRTEL",
             "idempotency_key": f"chat-pay2-{uuid4().hex[:12]}",
             "phone": "+256733300002",
         },
     )
     assert pay2.status_code == 201, pay2.text
+    paid2 = await complete_mock_momo_payment(client, ch, pay2.json())
+    assert paid2["status"] == "SUCCESS"
 
     # Get version from order
     detail = await client.get(f"/api/v1/orders/{oid2}", headers=oh)

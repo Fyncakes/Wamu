@@ -1,4 +1,4 @@
-"""Wamu-owned MoMo OTP for MTN / Airtel mock payments."""
+"""Wamu-owned MoMo OTP for Airtel mock payments (MTN uses live API)."""
 
 from __future__ import annotations
 
@@ -136,15 +136,14 @@ async def _order_and_pay(client, ch, env, provider: str):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider", ["MTN", "AIRTEL"])
-async def test_momo_otp_confirm_success(env, provider):
+async def test_momo_otp_confirm_success_airtel(env):
     client = env["client"]
     ch = env["customer_headers"]
-    order_id, body = await _order_and_pay(client, ch, env, provider)
+    order_id, body = await _order_and_pay(client, ch, env, "AIRTEL")
 
     assert body["status"] == "PROCESSING"
     assert body["otp_required"] is True
-    assert body["provider"] == provider
+    assert body["provider"] == "AIRTEL"
     assert body.get("mock_hint") == "123456"
     payment_id = body["id"]
 
@@ -174,3 +173,16 @@ async def test_momo_otp_confirm_success(env, provider):
     assert detail.status_code == 200
     assert detail.json()["status"] == "CONFIRMED"
     assert detail.json()["payment_status"] == "SUCCESS"
+
+
+@pytest.mark.asyncio
+async def test_mtn_not_routed_through_mock_when_mock_on(env, monkeypatch):
+    """MTN must use MTNAdapter even when PAYMENT_MOCK_AUTO_SUCCESS is on."""
+    from app.core.config import get_settings
+    from app.integrations.payments.provider import MTNAdapter, get_payment_provider
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "payment_mock_auto_success", True)
+    provider = get_payment_provider("MTN")
+    assert isinstance(provider, MTNAdapter)
+    assert provider.name == "MTN"

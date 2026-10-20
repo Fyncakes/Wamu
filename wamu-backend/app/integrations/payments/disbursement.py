@@ -400,7 +400,8 @@ class AirtelDisbursementAdapter(DisbursementProvider):
 def get_disbursement_provider(name: str) -> DisbursementProvider:
     settings = get_settings()
     key = (name or "MOCK").upper()
-    if settings.payment_mock_auto_success and key in {"MOCK", "MTN", "AIRTEL"}:
+    # Airtel (+ MOCK) mock theater; MTN always uses live disbursement adapter.
+    if settings.payment_mock_auto_success and key in {"MOCK", "AIRTEL"}:
         return NamedMockDisbursementProvider(key)
     mapping: dict[str, DisbursementProvider] = {
         "MOCK": MockDisbursementProvider(),
