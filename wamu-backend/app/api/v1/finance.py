@@ -111,15 +111,8 @@ async def business_finance_reports(
 ):
     summary = await finance_service.merchant_finance_summary(db, user, business_id)
     if format == "json":
-        return {
-            "summary": summary.model_dump(mode="json"),
-            "report_type": report_type,
-            "date_from": date_from,
-            "date_to": date_to,
-            "data_source": "live_database",
-        }
-    if format == "csv":
-        body = await finance_service.merchant_report_csv(
+        # JSON still returns the live summary plus which report was requested.
+        csv_preview = await finance_service.merchant_report_csv(
             db,
             user,
             business_id,
@@ -127,6 +120,23 @@ async def business_finance_reports(
             since=date_from,
             until=date_to,
         )
+        return {
+            "summary": summary.model_dump(mode="json"),
+            "report_type": report_type,
+            "date_from": date_from,
+            "date_to": date_to,
+            "data_source": "live_database",
+            "csv_preview": csv_preview[:4000],
+        }
+    body = await finance_service.merchant_report_csv(
+        db,
+        user,
+        business_id,
+        report_type=report_type,
+        since=date_from,
+        until=date_to,
+    )
+    if format == "csv":
         return Response(
             content=body,
             media_type="text/csv",
@@ -136,14 +146,21 @@ async def business_finance_reports(
                 )
             },
         )
-    # PDF
+    # PDF — type-specific content from the same CSV generator (not a shared summary page).
     from app.services import business as business_service
 
     biz = await business_service.get_business(db, business_id)
     pdf = finance_service.merchant_report_pdf_bytes(
         business_name=biz.name,
-        summary=summary,
         report_type=report_type,
+        csv_body=body,
+        summary=summary if (report_type or "").lower().strip() in {
+            "earnings",
+            "settlements",
+            "refunds",
+            "commissions",
+            "",
+        } else None,
     )
     return Response(
         content=pdf,

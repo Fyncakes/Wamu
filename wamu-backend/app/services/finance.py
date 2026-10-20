@@ -554,13 +554,25 @@ async def merchant_report_csv(
         return True
 
     if kind == "sales":
+        # Paid collections only — distinct from the full payments report.
         writer.writerow(
-            ["date", "payment_id", "order_id", "amount_ugx", "provider", "status", "reference"]
+            [
+                "sale_date",
+                "payment_id",
+                "order_id",
+                "amount_ugx",
+                "provider",
+                "payment_status",
+                "momo_reference",
+            ]
         )
         q = (
             select(Payment)
             .join(Order, Order.id == Payment.order_id)
-            .where(Order.business_id == business_id)
+            .where(
+                Order.business_id == business_id,
+                Payment.status == PaymentStatus.SUCCESS.value,
+            )
             .order_by(Payment.created_at.desc())
             .limit(5000)
         )
@@ -626,6 +638,7 @@ async def merchant_report_csv(
         return buf.getvalue()
 
     if kind == "payments":
+        # All payment attempts (pending/failed/success) + refund flags.
         writer.writerow(
             [
                 "payment_id",
@@ -806,28 +819,52 @@ async def merchant_report_csv(
 def merchant_report_pdf_bytes(
     *,
     business_name: str,
-    summary: FinanceSummaryResponse,
     report_type: str,
+    csv_body: str,
+    summary: FinanceSummaryResponse | None = None,
 ) -> bytes:
-    """Minimal single-page PDF without heavy deps (PDF 1.4 text objects)."""
-    lines = [
-        f"Wamu Merchant Report — {report_type}",
+    """Build a PDF for this report type from its CSV rows (not a shared summary).
+
+    Previously every PDF only printed the earnings summary, so sales/orders/
+    products downloads looked identical. Now each type embeds its own table.
+    """
+    kind = (report_type or "earnings").lower().strip()
+    lines: list[str] = [
+        f"Wamu Merchant Report — {kind}",
         f"Business: {business_name}",
-        f"Sales (gross): UGX {summary.sales_gross_minor}",
-        f"Commission: UGX {summary.commission_minor}",
-        f"Merchant net: UGX {summary.merchant_net_minor}",
-        f"Settled: UGX {summary.settled_minor}",
-        f"Outstanding: UGX {summary.outstanding_minor}",
-        f"Provider fees (est.): UGX {summary.provider_fees_est_minor}",
-        f"Delivery fees: UGX {summary.delivery_fees_minor}",
-        f"Refunds: UGX {summary.refunds_minor}",
-        f"Completed orders: {summary.completed_orders}",
     ]
+    if kind == "earnings" and summary is not None:
+        lines.extend(
+            [
+                f"Sales (gross): UGX {summary.sales_gross_minor}",
+                f"Commission: UGX {summary.commission_minor}",
+                f"Merchant net: UGX {summary.merchant_net_minor}",
+                f"Settled: UGX {summary.settled_minor}",
+                f"Outstanding: UGX {summary.outstanding_minor}",
+                f"Provider fees (est.): UGX {summary.provider_fees_est_minor}",
+                f"Delivery fees: UGX {summary.delivery_fees_minor}",
+                f"Refunds: UGX {summary.refunds_minor}",
+                f"Completed orders: {summary.completed_orders}",
+                "",
+                "Payouts / detail:",
+            ]
+        )
+    else:
+        lines.append("Detail rows (from this report):")
+
+    # Flatten CSV into readable lines; keep PDF short (first page).
+    csv_rows = [r for r in (csv_body or "").splitlines() if r.strip()]
+    max_rows = 35 if kind != "earnings" else 20
+    for row in csv_rows[:max_rows]:
+        # Soften commas for readability in Helvetica text
+        lines.append(row.replace(",", " | ")[:110])
+    if len(csv_rows) > max_rows:
+        lines.append(f"... {len(csv_rows) - max_rows} more rows in the CSV download")
 
     def esc(s: str) -> str:
         return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
-    content_lines = ["BT", "/F1 11 Tf", "50 780 Td", "14 TL"]
+    content_lines = ["BT", "/F1 9 Tf", "40 780 Td", "11 TL"]
     for i, line in enumerate(lines):
         if i == 0:
             content_lines.append(f"({esc(line)}) Tj")

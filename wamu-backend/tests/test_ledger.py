@@ -421,14 +421,16 @@ async def test_merchant_report_csv_types(env):
     )
     await _pay_mock(client, ch, order.json()["id"])
 
-    for report_type in (
-        "sales",
-        "orders",
-        "earnings",
-        "payments",
-        "products",
-        "deliveries",
-    ):
+    expected_headers = {
+        "sales": "sale_date",
+        "orders": "fulfillment",
+        "earnings": "gross_sales",
+        "payments": "refund_manual",
+        "products": "qty_sold",
+        "deliveries": "dropoff",
+    }
+    csv_bodies: dict[str, str] = {}
+    for report_type, marker in expected_headers.items():
         res = await client.get(
             f"/api/v1/businesses/{env['biz_id']}/finance/reports",
             headers=env["owner_headers"],
@@ -438,21 +440,30 @@ async def test_merchant_report_csv_types(env):
         assert "text/csv" in res.headers.get("content-type", "")
         body = res.text
         assert len(body) > 10
+        assert marker in body, f"{report_type} missing {marker}"
+        csv_bodies[report_type] = body
         if report_type == "sales":
-            assert "amount_ugx" in body
             assert "SUCCESS" in body
         if report_type == "products":
-            assert "qty_sold" in body
             assert "Ledger Meal" in body
 
-    pdf = await client.get(
-        f"/api/v1/businesses/{env['biz_id']}/finance/reports",
-        headers=env["owner_headers"],
-        params={"report_type": "earnings", "format": "pdf"},
-    )
-    assert pdf.status_code == 200, pdf.text
-    assert pdf.headers.get("content-type", "").startswith("application/pdf")
-    assert pdf.content[:4] == b"%PDF"
+    # Each report type must be distinct (not copies of earnings).
+    unique = set(csv_bodies.values())
+    assert len(unique) == len(csv_bodies), "report CSVs must differ by type"
+
+    pdfs: dict[str, bytes] = {}
+    for report_type in ("sales", "orders", "earnings", "products"):
+        pdf = await client.get(
+            f"/api/v1/businesses/{env['biz_id']}/finance/reports",
+            headers=env["owner_headers"],
+            params={"report_type": report_type, "format": "pdf"},
+        )
+        assert pdf.status_code == 200, f"{report_type} pdf: {pdf.text}"
+        assert pdf.headers.get("content-type", "").startswith("application/pdf")
+        assert pdf.content[:4] == b"%PDF"
+        assert report_type.encode() in pdf.content
+        pdfs[report_type] = pdf.content
+    assert len(set(pdfs.values())) == len(pdfs), "report PDFs must differ by type"
 
     denied = await client.get(
         f"/api/v1/businesses/{env['biz_id']}/finance/reports",
