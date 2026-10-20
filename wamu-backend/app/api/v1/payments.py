@@ -25,7 +25,10 @@ async def create_payment(
     db: AsyncSession = Depends(get_db),
 ):
     payment = await payment_service.initiate_payment(db, user, body)
-    return payment_service.payment_to_response(payment)
+    return payment_service.payment_to_response(
+        payment,
+        mock_hint=getattr(payment, "_response_mock_hint", None),
+    )
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)

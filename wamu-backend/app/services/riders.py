@@ -30,25 +30,24 @@ def _enqueue_rider_push(
     body: str,
     data: dict,
 ) -> None:
+    """Enqueue Celery push only — never run the task inline (avoids orphaned coroutines)."""
     try:
         from app.workers.tasks import send_push_notification
 
-        try:
-            send_push_notification.delay(
-                user_id=str(user_id),
-                title=title,
-                body=body,
-                data=data,
-            )
-        except Exception:
-            send_push_notification(
-                user_id=str(user_id),
-                title=title,
-                body=body,
-                data=data,
-            )
-    except Exception:
-        pass
+        send_push_notification.delay(
+            user_id=str(user_id),
+            title=title,
+            body=body,
+            data=data,
+        )
+    except Exception as exc:
+        broker_down = "Connection refused" in str(exc) or isinstance(
+            exc, ConnectionRefusedError
+        )
+        if broker_down:
+            logger.info("Rider push skipped (broker unavailable) user_id=%s", user_id)
+        else:
+            logger.warning("Rider push enqueue failed user_id=%s: %s", user_id, exc)
 
 
 async def _notify_rider_job(

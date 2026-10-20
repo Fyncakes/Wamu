@@ -31,6 +31,18 @@ def setup_logging(debug: bool = False) -> None:
     root.addHandler(handler)
     root.setLevel(level)
 
+    # Never echo SQL binds / driver chatter — they include phones, emails, tokens.
+    for noisy in (
+        "sqlalchemy.engine",
+        "sqlalchemy.engine.Engine",
+        "sqlalchemy.pool",
+        "aiosqlite",
+        "httpx",
+        "httpcore",
+        "asyncio",
+    ):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
 
 def new_request_id() -> str:
     return uuid.uuid4().hex[:16]

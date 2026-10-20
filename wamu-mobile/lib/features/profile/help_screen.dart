@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -55,6 +56,12 @@ class HelpScreen extends StatelessWidget {
             leading: Icon(Icons.info_outline, color: AppTheme.accentGreen),
             title: Text("Uganda's Digital Home"),
             subtitle: Text('Connect. Discover. Shop. Move. Grow.'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.school_outlined, color: AppTheme.accentGreen),
+            title: const Text('Replay app tour'),
+            subtitle: const Text('Short guide to Videos, Chats, Shops, Orders, and You'),
+            onTap: () => context.push('/welcome?replay=1'),
           ),
           const Divider(),
           ...faqs.map(

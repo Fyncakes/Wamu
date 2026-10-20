@@ -470,6 +470,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: 'FAQ, contact us, app info',
                   onTap: () => context.push('/help'),
                 ),
+                _YouTile(
+                  icon: Icons.school_outlined,
+                  title: 'App tour',
+                  subtitle: 'Replay the welcome tutorial',
+                  onTap: () => context.push('/welcome?replay=1'),
+                ),
                 const Divider(height: 24),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.redAccent),

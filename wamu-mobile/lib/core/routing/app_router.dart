@@ -11,6 +11,8 @@ import '../../features/auth/otp_screen.dart';
 import '../../features/auth/profile_setup_screen.dart';
 import '../../features/auth/server_setup_screen.dart';
 import '../../features/auth/splash_screen.dart';
+import '../../features/onboarding/tutorial_prefs.dart';
+import '../../features/onboarding/welcome_tutorial_screen.dart';
 import '../../core/server_config.dart';
 import '../../features/business_owner/business_dashboard_screens.dart';
 import '../../features/business_owner/business_owner_screen.dart';
@@ -53,21 +55,25 @@ import '../../shared/widgets/main_tab_swipe.dart';
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
-    refreshListenable: _AuthRefreshListenable(ref),
+    refreshListenable: _RouterRefreshListenable(ref),
     redirect: (context, state) {
       final auth = ref.read(authProvider);
+      final tutorial = ref.read(tutorialControllerProvider);
       final loc = state.matchedLocation;
       final isServerSetup = loc == '/server-setup';
       final isAuthRoute =
           loc == '/login' || loc == '/otp' || loc.startsWith('/otp') || isServerSetup;
       final isSplash = loc == '/splash';
+      final isWelcome = loc == '/welcome';
+      final welcomeReplay = state.uri.queryParameters['replay'] == '1';
 
       // First launch on a physical phone: must pick PC / tunnel URL once.
       if (ServerConfig.needsSetup && !isServerSetup && !isSplash) {
         return '/server-setup';
       }
 
-      if (auth.status == AuthStatus.unknown) {
+      if (auth.status == AuthStatus.unknown ||
+          tutorial.status == TutorialStatus.unknown) {
         return isSplash ? null : '/splash';
       }
       if (auth.status == AuthStatus.unauthenticated) {
@@ -78,8 +84,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
       // Allow changing PC server while logged in
       if (isServerSetup) return null;
-      if (isAuthRoute || isSplash || loc == '/login' || loc == '/profile-setup') {
+
+      // Product tour after profile is ready — never blocks OTP / login.
+      if (tutorial.status == TutorialStatus.needed && !isWelcome) {
+        return '/welcome';
+      }
+      if (isWelcome &&
+          tutorial.status == TutorialStatus.completed &&
+          !welcomeReplay) {
         return '/home';
+      }
+      if (welcomeReplay && isWelcome) return null;
+
+      if (isAuthRoute || isSplash || loc == '/login' || loc == '/profile-setup') {
+        return tutorial.status == TutorialStatus.needed ? '/welcome' : '/home';
       }
       return null;
     },
@@ -101,6 +119,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/profile-setup', builder: (_, __) => const ProfileSetupScreen()),
+      GoRoute(
+        path: '/welcome',
+        builder: (context, state) {
+          final replay = state.uri.queryParameters['replay'] == '1';
+          return WelcomeTutorialScreen(replay: replay);
+        },
+      ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
@@ -243,9 +268,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class _AuthRefreshListenable extends ChangeNotifier {
-  _AuthRefreshListenable(this.ref) {
+class _RouterRefreshListenable extends ChangeNotifier {
+  _RouterRefreshListenable(this.ref) {
     ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+    final tutorial = ref.read(tutorialControllerProvider);
+    tutorial.addListener(notifyListeners);
+    ref.onDispose(() => tutorial.removeListener(notifyListeners));
   }
 
   final Ref ref;

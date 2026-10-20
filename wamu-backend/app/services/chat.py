@@ -65,7 +65,8 @@ def _enqueue_message_pushes(
                 break
             cur = cur.__cause__ or cur.__context__
         if broker_down:
-            logger.warning(
+            # Expected on local demo without Redis/Celery — not an app fault.
+            logger.info(
                 "Push skipped (broker unavailable) conversation_id=%s", conversation_id
             )
         else:

@@ -46,10 +46,9 @@ def payment_to_response(payment: Payment, *, mock_hint: str | None = None) -> Pa
         PaymentStatus.PENDING.value,
         PaymentStatus.PROCESSING.value,
     }
-    hint = mock_hint if mock_hint is not None else raw.get("mock_hint")
+    # mock_hint is request-scoped only (never read back from DB raw_response).
     settings = get_settings()
-    if not settings.otp_mock_mode:
-        hint = None
+    hint = mock_hint if settings.otp_mock_mode else None
     return PaymentResponse(
         id=payment.id,
         order_id=payment.order_id,
@@ -82,13 +81,11 @@ async def _issue_payment_otp(db: AsyncSession, payment: Payment) -> str | None:
         expires_at=datetime.now(timezone.utc) + timedelta(seconds=settings.otp_expire_seconds),
     )
     db.add(challenge)
+    # Persist otp_required only — never store plaintext OTP / mock_hint in the DB.
     raw = dict(payment.raw_response or {})
     raw["otp_required"] = True
     raw["provider"] = payment.provider
-    if settings.otp_mock_mode:
-        raw["mock_hint"] = code
-    else:
-        raw.pop("mock_hint", None)
+    raw.pop("mock_hint", None)
     payment.raw_response = raw
     await db.flush()
     try:
@@ -250,11 +247,14 @@ async def initiate_payment(db: AsyncSession, user: User, data: PaymentCreate) ->
         else PaymentStatus.PROCESSING.value
     )
 
+    mock_hint: str | None = None
     if payment.status == PaymentStatus.SUCCESS.value:
         await finalize_payment_success(db, payment)
     elif _momo_otp_rail(payment.provider) and (result.raw or {}).get("otp_required"):
-        await _issue_payment_otp(db, payment)
+        mock_hint = await _issue_payment_otp(db, payment)
     await db.flush()
+    # Request-scoped only — not a DB column (avoids persisting OTP plaintext).
+    payment._response_mock_hint = mock_hint  # type: ignore[attr-defined]
     return payment
 
 

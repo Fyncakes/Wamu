@@ -34,7 +34,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             name,
             email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
           );
-      if (mounted) context.go('/chats');
+      // Router sends first-time users to /welcome when the tour is still needed.
+      if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
