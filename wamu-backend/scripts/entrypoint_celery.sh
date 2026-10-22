@@ -10,6 +10,10 @@ case "$ROLE" in
   worker)
     celery -A app.workers.celery_app.celery_app worker -l info &
     ;;
+  worker-beat)
+    # One Railway service instead of separate worker + beat (trial: 5 services/project).
+    celery -A app.workers.celery_app.celery_app worker -B -l info &
+    ;;
   beat)
     celery -A app.workers.celery_app.celery_app beat -l info &
     ;;

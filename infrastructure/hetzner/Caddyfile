@@ -1,0 +1,7 @@
+# Replace {$WAMU_DOMAIN} via env or edit to api.wamu.ug / your tunnel hostname.
+# For IP-only smoke tests use the Cloudflare tunnel path in README instead.
+
+{$WAMU_DOMAIN:api.wamu.ug} {
+	encode gzip
+	reverse_proxy api:8000
+}

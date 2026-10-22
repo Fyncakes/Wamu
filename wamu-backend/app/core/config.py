@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0-mvp"
     environment: str = "development"  # development | staging | production
     debug: bool = True
+    # Opt-in SQLAlchemy echo (binds/phones) — keep false for demo logs.
+    sql_echo: bool = False
     secret_key: str = "change-me-in-production-use-long-random-string"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30

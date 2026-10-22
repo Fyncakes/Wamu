@@ -22,7 +22,7 @@ from app.models.payout import MerchantPayout, OwnerPayout, RiderPayout
 from app.models.product import Product, ProductImage
 from app.models.report import Report
 from app.models.review import Review
-from app.models.rider import Delivery, Ride, RiderDocument, RiderProfile
+from app.models.rider import Delivery, DeliveryFareOffer, Ride, RiderDocument, RiderProfile
 from app.models.status import StatusUpdate
 from app.models.user import DeviceLinkChallenge, Session, User, UserProfile
 from app.models.settings import AppSetting
@@ -64,6 +64,7 @@ __all__ = [
     "Report",
     "Review",
     "Delivery",
+    "DeliveryFareOffer",
     "Ride",
     "RiderDocument",
     "RiderProfile",

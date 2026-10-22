@@ -32,7 +32,7 @@ from app.services.business import assert_business_member
 
 
 PICKUP_FEE = Decimal("0")
-DELIVERY_FEE_DEFAULT = Decimal("5000")  # UGX flat MVP fee for delivery
+DELIVERY_FEE_DEFAULT = Decimal("5000")  # fallback only — prefer delivery_fare.quote
 
 
 def _enqueue_commerce_push(
@@ -169,13 +169,22 @@ async def create_order(db: AsyncSession, user: User, data: OrderCreate) -> Order
             )
         data.delivery_address = addr
 
+    fare_snapshot = None
     if merchant_receipt and data.delivery_fee is not None:
         delivery_fee = Decimal(data.delivery_fee).quantize(Decimal("0.01"))
     elif data.checkout_batch_id is not None and data.delivery_fee is not None:
         # Multi-shop batch: fee charged once on first sub-order, 0 on the rest.
         delivery_fee = Decimal(data.delivery_fee).quantize(Decimal("0.01"))
+    elif fulfillment == "PICKUP":
+        delivery_fee = PICKUP_FEE
     else:
-        delivery_fee = PICKUP_FEE if fulfillment == "PICKUP" else DELIVERY_FEE_DEFAULT
+        from app.services.delivery_fare import default_delivery_fee_for_order
+
+        delivery_fee, fare_snapshot = await default_delivery_fee_for_order(
+            db,
+            business_id=data.business_id,
+            delivery_address=data.delivery_address,
+        )
     total = (subtotal + delivery_fee).quantize(Decimal("0.01"))
 
     order = Order(
@@ -288,11 +297,19 @@ async def create_order_batch(
 
     batch_id = uuid.uuid4()
     orders: list[Order] = []
+    first_delivery_fee: Decimal | None = None
+    if fulfillment == "DELIVERY" and data.shops:
+        from app.services.delivery_fare import default_delivery_fee_for_order
+
+        first_delivery_fee, _ = await default_delivery_fee_for_order(
+            db,
+            business_id=data.shops[0].business_id,
+            delivery_address=data.delivery_address,
+        )
     for idx, shop in enumerate(data.shops):
-        # Charge delivery once across the multi-shop bag.
-        fee = None
+        # Charge delivery once across the multi-shop bag (road-distance quote on first shop).
         if fulfillment == "DELIVERY":
-            fee = DELIVERY_FEE_DEFAULT if idx == 0 else Decimal("0")
+            fee = first_delivery_fee if idx == 0 else Decimal("0")
         else:
             fee = PICKUP_FEE
         sub = await create_order(
@@ -757,6 +774,68 @@ async def get_order(db: AsyncSession, order_id: uuid.UUID) -> Order:
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
+
+
+async def enrich_order_responses(db: AsyncSession, orders: list[Order]) -> list:
+    """Attach live product thumbnails + shop branding for order list/detail UI."""
+    from app.models.business import Business
+    from app.models.product import ProductImage
+    from app.schemas.commerce import OrderItemResponse, OrderResponse
+
+    if not orders:
+        return []
+
+    product_ids = {
+        item.product_id for order in orders for item in (order.items or [])
+    }
+    business_ids = {order.business_id for order in orders}
+
+    image_by_product: dict[uuid.UUID, str] = {}
+    if product_ids:
+        rows = (
+            await db.execute(
+                select(ProductImage)
+                .where(ProductImage.product_id.in_(product_ids))
+                .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+            )
+        ).scalars().all()
+        for img in rows:
+            if img.product_id not in image_by_product and img.url:
+                image_by_product[img.product_id] = img.url
+
+    biz_by_id: dict[uuid.UUID, Business] = {}
+    if business_ids:
+        biz_rows = (
+            await db.execute(select(Business).where(Business.id.in_(business_ids)))
+        ).scalars().all()
+        biz_by_id = {b.id: b for b in biz_rows}
+
+    out: list[OrderResponse] = []
+    for order in orders:
+        base = OrderResponse.model_validate(order)
+        items = [
+            OrderItemResponse(
+                id=item.id,
+                product_id=item.product_id,
+                product_name=item.product_name,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                subtotal=item.subtotal,
+                image_url=image_by_product.get(item.product_id),
+            )
+            for item in (order.items or [])
+        ]
+        biz = biz_by_id.get(order.business_id)
+        out.append(
+            base.model_copy(
+                update={
+                    "items": items,
+                    "business_name": biz.name if biz else None,
+                    "business_logo_url": biz.logo_url if biz else None,
+                }
+            )
+        )
+    return out
 
 
 async def list_customer_orders(db: AsyncSession, user: User) -> list[Order]:

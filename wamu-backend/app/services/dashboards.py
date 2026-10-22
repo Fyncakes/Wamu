@@ -407,6 +407,11 @@ async def rider_earnings(db: AsyncSession, user: User) -> dict:
         "vehicle_type": rider.vehicle_type,
         "plate_number": rider.plate_number,
         "status": rider.status,
+        "preferred_min_per_km_ugx": (
+            float(rider.preferred_min_per_km_ugx)
+            if getattr(rider, "preferred_min_per_km_ugx", None) is not None
+            else None
+        ),
     }
 
 

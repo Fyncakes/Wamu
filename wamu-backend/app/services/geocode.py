@@ -10,7 +10,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Common Kampala places used in demo checkout (lat, lng).
+# Common Kampala / Greater Kampala places used in checkout (lat, lng).
 _KAMPALA_PLACES: dict[str, tuple[float, float]] = {
     "kisaasi": (0.3668, 32.5969),
     "kisaas": (0.3668, 32.5969),
@@ -37,6 +37,23 @@ _KAMPALA_PLACES: dict[str, tuple[float, float]] = {
     "kamwokya": (0.3415, 32.5835),
     "old kampala": (0.3155, 32.5675),
     "industrial area": (0.3120, 32.6050),
+    # Addresses that previously failed Nominatim in demo logs
+    "luteete": (0.3925, 32.5885),
+    "lutete": (0.3925, 32.5885),
+    "gazaya": (0.3900, 32.5900),
+    "gazaya road": (0.3900, 32.5900),
+    "kasangati": (0.4400, 32.6050),
+    "gayaza": (0.4480, 32.5950),
+    "bwaise": (0.3520, 32.5550),
+    "kawempe": (0.3700, 32.5550),
+    "mulago": (0.3380, 32.5760),
+    "nakasero": (0.3220, 32.5820),
+    "garden city": (0.3325, 32.5910),
+    "acacia mall": (0.3470, 32.5880),
+    "oasis mall": (0.3180, 32.5885),
+    "village mall": (0.3485, 32.6080),
+    "mbarara": (0.6070, 30.6550),  # outside Kampala — still pin for road estimate
+    "ruharo": (0.6020, 30.6400),
 }
 
 

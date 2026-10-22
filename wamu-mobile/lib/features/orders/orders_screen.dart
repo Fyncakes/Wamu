@@ -16,6 +16,7 @@ import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
 import '../../shared/widgets/momo_otp_dialog.dart';
 import '../../shared/widgets/momo_provider_picker.dart';
+import '../../shared/widgets/wamu_network_image.dart';
 import '../businesses/favorites_repository.dart';
 import '../discover/videos_feed_visibility.dart';
 import '../move/riders_repository.dart';
@@ -38,6 +39,52 @@ Color _statusColor(String status) {
       return Colors.red;
     default:
       return Colors.grey;
+  }
+}
+
+class _OrderThumb extends StatelessWidget {
+  const _OrderThumb({
+    required this.imageUrl,
+    required this.fallbackLabel,
+    this.size = 64,
+  });
+
+  final String? imageUrl;
+  final String fallbackLabel;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final radius = BorderRadius.circular(12);
+    return ClipRRect(
+      borderRadius: radius,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: imageUrl != null && imageUrl!.trim().isNotEmpty
+            ? WamuNetworkImage(
+                imageUrl: imageUrl,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                borderRadius: radius,
+              )
+            : ColoredBox(
+                color: dark ? const Color(0xFF2A2F33) : const Color(0xFFE8F0EC),
+                child: Center(
+                  child: Text(
+                    fallbackLabel.isEmpty ? '?' : fallbackLabel,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: size * 0.34,
+                      color: AppTheme.accentGreen,
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
   }
 }
 
@@ -160,63 +207,113 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
                           final shortId =
                               order.id.length > 8 ? order.id.substring(0, 8) : order.id;
                           final payLabel = order.paymentLabel;
-                return Card(
+                          final shop = order.businessName?.trim();
+                          final itemLine =
+                              '${order.items.map((i) => i.name).take(2).join(', ')}'
+                              '${order.items.length > 2 ? '…' : ''}';
+                          return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: ListTile(
-                              title: Text('Order · $shortId'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${order.items.map((i) => i.name).take(2).join(', ')}'
-                                    '${order.items.length > 2 ? '…' : ''}',
-                                  ),
-                                  if (payLabel.isNotEmpty)
-                                    Text(
-                                      payLabel,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: orderPaymentColor(order.paymentStatus),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              isThreeLine: payLabel.isNotEmpty,
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    formatUgx(order.total),
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _statusColor(order.status).withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      order.status,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: _statusColor(order.status),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
                               onTap: () async {
                                 await context.push('/orders/${order.id}');
                                 if (mounted) _refresh();
                               },
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _OrderThumb(
+                                      imageUrl: order.previewImageUrl,
+                                      fallbackLabel: shop?.isNotEmpty == true
+                                          ? shop![0].toUpperCase()
+                                          : 'O',
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  shop != null && shop.isNotEmpty
+                                                      ? shop
+                                                      : 'Order · $shortId',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                              Text(
+                                                formatUgx(order.total),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            itemLine.isEmpty ? 'Order · $shortId' : itemLine,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.color,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              if (payLabel.isNotEmpty)
+                                                Expanded(
+                                                  child: Text(
+                                                    payLabel,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: orderPaymentColor(
+                                                        order.paymentStatus,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                )
+                                              else
+                                                const Spacer(),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: _statusColor(order.status)
+                                                      .withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  order.status,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: _statusColor(order.status),
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -716,21 +813,50 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                         padding: const EdgeInsets.all(16),
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  formatUgx(order.total),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
+                              _OrderThumb(
+                                imageUrl: order.previewImageUrl,
+                                fallbackLabel: () {
+                                  final name = order.businessName?.trim() ?? '';
+                                  if (name.isNotEmpty) return name[0].toUpperCase();
+                                  return 'O';
+                                }(),
+                                size: 72,
                               ),
-                              Chip(
-                                label: Text(order.status),
-                                backgroundColor:
-                                    _statusColor(order.status).withValues(alpha: 0.15),
-                                labelStyle: TextStyle(color: _statusColor(order.status)),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (order.businessName != null &&
+                                        order.businessName!.trim().isNotEmpty)
+                                      Text(
+                                        order.businessName!,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(fontWeight: FontWeight.w800),
+                                      ),
+                                    Text(
+                                      formatUgx(order.total),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Chip(
+                                      label: Text(order.status),
+                                      visualDensity: VisualDensity.compact,
+                                      backgroundColor: _statusColor(order.status)
+                                          .withValues(alpha: 0.15),
+                                      labelStyle: TextStyle(
+                                        color: _statusColor(order.status),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -754,12 +880,41 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                           Text('Items', style: Theme.of(context).textTheme.titleLarge),
                           const SizedBox(height: 8),
                           ...order.items.map(
-                            (item) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(item.name),
-                              subtitle:
-                                  Text('${item.quantity} × ${formatUgx(item.price)}'),
-                              trailing: Text(formatUgx(item.price * item.quantity)),
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: [
+                                  _OrderThumb(
+                                    imageUrl: item.imageUrl ?? order.businessLogoUrl,
+                                    fallbackLabel: item.name.isNotEmpty
+                                        ? item.name[0].toUpperCase()
+                                        : '?',
+                                    size: 56,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${item.quantity} × ${formatUgx(item.price)}',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    formatUgx(item.price * item.quantity),
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const Divider(height: 32),

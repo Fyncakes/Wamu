@@ -14,9 +14,11 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+# Never enable SQLAlchemy echo in demos — it floods logs with binds (phones, hashes).
+# Opt in only with SQL_ECHO=true for local deep debugging.
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug and settings.environment == "development",
+    echo=bool(getattr(settings, "sql_echo", False)),
     pool_pre_ping=True,
 )
 

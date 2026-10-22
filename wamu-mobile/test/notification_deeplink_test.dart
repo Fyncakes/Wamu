@@ -44,6 +44,20 @@ void main() {
     );
     expect(
       notificationDeepLink(
+        type: 'FARE_OFFER',
+        data: {'order_id': 'o-fare'},
+      ),
+      '/orders/o-fare',
+    );
+    expect(
+      notificationDeepLink(
+        type: 'FARE_OFFER_EXPIRED',
+        data: {'order_id': 'o-exp'},
+      ),
+      '/orders/o-exp',
+    );
+    expect(
+      notificationDeepLink(
         type: 'NEW_MESSAGE',
         data: {'conversation_id': 'c1'},
       ),

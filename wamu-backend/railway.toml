@@ -1,0 +1,12 @@
+# Railway service config when root directory is wamu-backend.
+# Worker service: override start command in dashboard → /app/scripts/entrypoint_celery.sh worker-beat
+# https://docs.railway.com/guides/config-as-code
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"

@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/utils/ugx_formatter.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
+import 'riders_repository.dart';
 
 /// Rider earnings, vehicle, safety, and online controls.
 class RiderDashboardScreen extends ConsumerStatefulWidget {
@@ -73,6 +74,96 @@ class _RiderDashboardScreenState extends ConsumerState<RiderDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openPricingPrefs(Map<String, dynamic> earnings) async {
+    final repo = ref.read(ridersRepositoryProvider);
+    Map<String, dynamic> cfg = {};
+    Map<String, dynamic>? profile;
+    try {
+      cfg = await repo.fareConfig();
+      profile = await repo.myRiderProfile();
+    } catch (_) {}
+    if (!mounted) return;
+    final current = profile?['preferred_min_per_km_ugx'] ??
+        earnings['preferred_min_per_km_ugx'];
+    final ctrl = TextEditingController(
+      text: current == null ? '' : '${(current as num).round()}',
+    );
+    final base = cfg['base_fee_ugx'];
+    final perKm = cfg['per_km_ugx'];
+    final minFee = cfg['min_fee_ugx'];
+    final maxFee = cfg['max_fee_ugx'];
+    final cap = cfg['rider_min_per_km_cap_ugx'];
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delivery pricing'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Wamu default rates',
+                style: Theme.of(ctx).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Base ${base != null ? formatUgx((base as num).toDouble()) : '—'} · '
+                '${perKm != null ? formatUgx((perKm as num).toDouble()) : '—'}/km\n'
+                'Fare range ${minFee != null ? formatUgx((minFee as num).toDouble()) : '—'}'
+                ' – ${maxFee != null ? formatUgx((maxFee as num).toDouble()) : '—'}',
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Your preferred minimum / km'
+                '${cap != null ? ' (max ${formatUgx((cap as num).toDouble())})' : ''}',
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'UGX per km (optional)',
+                  hintText: 'Leave blank to clear',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Preferences cannot override Wamu fare limits or change verified coordinates.',
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Close')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    final raw = ctrl.text.trim();
+    ctrl.dispose();
+    if (saved != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await repo.updatePricingPrefs(
+        preferredMinPerKmUgx: raw.isEmpty ? null : double.tryParse(raw),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pricing preference saved')),
+        );
+        setState(() => _future = _load());
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -156,6 +247,17 @@ class _RiderDashboardScreenState extends ConsumerState<RiderDashboardScreen> {
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/rider/payouts'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.price_change_outlined, color: AppTheme.accentGreen),
+                title: const Text('Delivery pricing'),
+                subtitle: Text(
+                  d['preferred_min_per_km_ugx'] != null
+                      ? 'Min ${formatUgx((d['preferred_min_per_km_ugx'] as num).toDouble())}/km preference'
+                      : 'View Wamu rates · set preferred min per km',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _openPricingPrefs(d),
               ),
               ListTile(
                 leading: const Icon(Icons.account_balance_wallet_outlined, color: AppTheme.accentGreen),

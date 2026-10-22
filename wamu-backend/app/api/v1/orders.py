@@ -25,7 +25,9 @@ async def create_order(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await order_service.create_order(db, user, body)
+    order = await order_service.create_order(db, user, body)
+    enriched = await order_service.enrich_order_responses(db, [order])
+    return enriched[0]
 
 
 @router.post("/batch", response_model=OrderBatchResponse, status_code=201)
@@ -35,7 +37,10 @@ async def create_order_batch(
     db: AsyncSession = Depends(get_db),
 ):
     """Multi-shop checkout — one parent batch, one sub-order per merchant."""
-    return await order_service.create_order_batch(db, user, body)
+    batch = await order_service.create_order_batch(db, user, body)
+    orm_orders = [await order_service.get_order(db, o.id) for o in batch.orders]
+    batch.orders = await order_service.enrich_order_responses(db, orm_orders)
+    return batch
 
 
 @router.patch("/{order_id}/receipt", response_model=OrderResponse)
@@ -46,12 +51,15 @@ async def revise_receipt(
     db: AsyncSession = Depends(get_db),
 ):
     """Merchant edits an unpaid receipt after renegotiation in chat."""
-    return await order_service.revise_receipt(db, user, order_id, body)
+    order = await order_service.revise_receipt(db, user, order_id, body)
+    enriched = await order_service.enrich_order_responses(db, [order])
+    return enriched[0]
 
 
 @router.get("", response_model=list[OrderResponse])
 async def my_orders(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await order_service.list_customer_orders(db, user)
+    orders = await order_service.list_customer_orders(db, user)
+    return await order_service.enrich_order_responses(db, orders)
 
 
 @router.get("/business/{business_id}", response_model=list[OrderResponse])
@@ -60,7 +68,8 @@ async def business_orders(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await order_service.list_business_orders(db, user, business_id)
+    orders = await order_service.list_business_orders(db, user, business_id)
+    return await order_service.enrich_order_responses(db, orders)
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
@@ -75,7 +84,8 @@ async def get_order(
         from app.services.business import assert_business_member
 
         await assert_business_member(db, user, order.business_id)
-    return order
+    enriched = await order_service.enrich_order_responses(db, [order])
+    return enriched[0]
 
 
 @router.patch("/{order_id}/status", response_model=OrderResponse)
@@ -85,4 +95,6 @@ async def update_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await order_service.update_order_status(db, user, order_id, body)
+    order = await order_service.update_order_status(db, user, order_id, body)
+    enriched = await order_service.enrich_order_responses(db, [order])
+    return enriched[0]

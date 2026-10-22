@@ -79,6 +79,7 @@ class RiderResponse(BaseModel):
     # Own-profile only — omit on public rider cards if not loaded
     payout_phone: str | None = None
     payout_provider: str | None = None
+    preferred_min_per_km_ugx: Decimal | None = None
 
 
 class RiderPayoutSettingsUpdate(BaseModel):
@@ -108,6 +109,9 @@ class DeliveryResponse(BaseModel):
     shop_name: str | None = None
     rider: RiderResponse | None = None
     created_at: datetime | None = None
+    distance_km: Decimal | None = None
+    estimated_fee: Decimal | None = None
+    agreed_fee: Decimal | None = None
 
 
 class RideCreate(BaseModel):

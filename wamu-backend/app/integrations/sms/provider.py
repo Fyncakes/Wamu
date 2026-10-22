@@ -19,10 +19,11 @@ class SMSProvider(ABC):
 
 
 class MockSMSProvider(SMSProvider):
-    """Logs OTP instead of sending SMS. Ideal for local demos."""
+    """Queues mock OTP without SMS. Code is returned via API mock_hint only — never logged."""
 
     async def send_otp(self, phone: str, code: str) -> None:
-        logger.info("MOCK SMS OTP to %s → %s", phone, code)
+        _ = code  # available to caller via mock_hint; do not write plaintext OTP to logs
+        logger.info("MOCK SMS OTP queued to %s (code omitted from logs)", phone)
 
 
 class AfricasTalkingSMSProvider(SMSProvider):

@@ -2,7 +2,11 @@
 
 One path from a clean machine to a healthy staging API. Product features stop here; this is the ship gate.
 
-## Prerequisites
+## Hosted staging (Railway trial)
+
+For a public HTTPS API without running Docker on your laptop, use **[`infrastructure/railway/README.md`](../infrastructure/railway/README.md)** and **[`documentation/MTN_RAILWAY_LAUNCH.md`](./MTN_RAILWAY_LAUNCH.md)** (GitHub → Railway, MTN-first, mock OTP/payments for first demo). Run `./infrastructure/railway/bootstrap_env.sh` for generated secrets.
+
+## Prerequisites (local Docker)
 
 - Docker + Docker Compose v2 (your user must be in the `docker` group — `groups` should list `docker`)
 - Ports free: `5432`, `6379`, `8000`, `9000`, `9001`

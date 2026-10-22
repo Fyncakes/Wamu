@@ -7,6 +7,8 @@ void main() {
     expect(isCommerceNotificationType('NEW_ORDER'), isTrue);
     expect(isCommerceNotificationType('order_paid'), isTrue);
     expect(isCommerceNotificationType('DELIVERY_ASSIGNED'), isTrue);
+    expect(isCommerceNotificationType('FARE_OFFER'), isTrue);
+    expect(isCommerceNotificationType('FARE_OFFER_EXPIRED'), isTrue);
     expect(isCommerceNotificationType('NEW_MESSAGE'), isFalse);
     expect(isCommerceNotificationType('INCOMING_CALL'), isFalse);
   });
@@ -20,6 +22,10 @@ void main() {
     expect(
       notificationDeepLink(type: 'DELIVERY_ASSIGNED', data: {'order_id': 'o2'}),
       '/orders/o2',
+    );
+    expect(
+      notificationDeepLink(type: 'FARE_OFFER', data: {'order_id': 'o3'}),
+      '/orders/o3',
     );
   });
 }

@@ -653,6 +653,31 @@ async def admin_broadcast(
     )
 
 
+@router.get("/settings/delivery-fare")
+async def get_delivery_fare_settings(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin delivery pricing: base, per-km, min/max, counteroffer bounds."""
+    _ = admin
+    from app.services import delivery_fare as fare_svc
+
+    cfg = await fare_svc.get_fare_config(db)
+    return cfg.to_dict()
+
+
+@router.put("/settings/delivery-fare")
+async def put_delivery_fare_settings(
+    body: dict,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import delivery_fare as fare_svc
+
+    cfg = await fare_svc.set_fare_config(db, body, actor_id=admin.id)
+    return cfg.to_dict()
+
+
 @router.get("/settings/video-retention")
 async def get_video_retention(
     admin: User = Depends(get_current_admin),

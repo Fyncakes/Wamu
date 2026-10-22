@@ -60,7 +60,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
       icon: Icons.payments_outlined,
       title: 'Payments and delivery',
       body:
-          'Pay with MTN MoMo or Airtel Money. Track status on Orders — merchants prepare, then riders deliver when you choose delivery.',
+          'Pay with MTN MoMo (Airtel Money when we enable it on your build). Track status on Orders — merchants prepare, then riders deliver when you choose delivery.',
       tip: 'Use a Uganda mobile-money number you control.',
     ),
     _TutorialStep(

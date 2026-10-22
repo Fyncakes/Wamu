@@ -3,11 +3,28 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def _run_coro(coro: Coroutine[Any, Any, T]) -> T:
+    """Run async work from sync Celery tasks, including eager mode inside pytest's loop."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    # Already inside an event loop (pytest-asyncio / ASGI). asyncio.run() would
+    # orphan the coroutine → RuntimeWarning. Use a dedicated thread + fresh loop.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
 
 
 @celery_app.task(name="wamu.send_push_notification")
@@ -57,9 +74,9 @@ def send_push_notification(
                         data=safe_data,
                     )
                 )
-            except Exception as exc:
+            except Exception:
                 logger.exception("PUSH send failed user=%s", user_id)
-                results.append({"status": "error", "detail": str(exc)})
+                results.append({"status": "error", "detail": "send_failed"})
         return {
             "status": "ok",
             "user_id": user_id,
@@ -68,7 +85,7 @@ def send_push_notification(
         }
 
     try:
-        return asyncio.run(_run())
+        return _run_coro(_run())
     except Exception as exc:
         logger.exception("send_push_notification task failed")
         return {"status": "error", "detail": str(exc)}
@@ -90,7 +107,7 @@ def reconcile_payments(stale_hours: int = 24, limit: int = 50) -> dict:
             return summary
 
     try:
-        return asyncio.run(_run())
+        return _run_coro(_run())
     except Exception as exc:
         logger.exception("reconcile_payments task failed")
         return {"status": "error", "detail": str(exc)}
@@ -112,7 +129,7 @@ def reconcile_payouts(stale_hours: int = 24, limit: int = 50) -> dict:
             return summary
 
     try:
-        return asyncio.run(_run())
+        return _run_coro(_run())
     except Exception as exc:
         logger.exception("reconcile_payouts task failed")
         return {"status": "error", "detail": str(exc)}
@@ -134,7 +151,7 @@ def statement_reconciliation(provider: str = "MTN") -> dict:
             return summary
 
     try:
-        return asyncio.run(_run())
+        return _run_coro(_run())
     except Exception as exc:
         logger.exception("statement_reconciliation task failed")
         return {"status": "error", "detail": str(exc)}
@@ -154,7 +171,7 @@ def video_lifecycle() -> dict:
             return summary
 
     try:
-        return asyncio.run(_run())
+        return _run_coro(_run())
     except Exception as exc:
         logger.exception("video_lifecycle task failed")
         return {"status": "error", "detail": str(exc)}

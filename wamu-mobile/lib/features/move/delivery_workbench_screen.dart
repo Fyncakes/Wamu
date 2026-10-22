@@ -178,13 +178,136 @@ class _DeliveryWorkbenchScreenState extends ConsumerState<DeliveryWorkbenchScree
   Future<void> _claim(Map<String, dynamic> delivery) async {
     final id = delivery['id']?.toString();
     if (id == null) return;
+    final fee = (delivery['fee'] is num)
+        ? (delivery['fee'] as num).toDouble()
+        : double.tryParse('${delivery['fee']}') ?? 0;
+    final estimated = (delivery['estimated_fee'] is num)
+        ? (delivery['estimated_fee'] as num).toDouble()
+        : fee;
+    final distanceKm = delivery['distance_km'];
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Delivery fare',
+                  style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Suggested ${formatUgx(estimated)}'
+                  '${distanceKm != null ? ' · ~$distanceKm km road' : ''}',
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, 'accept'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.accentGreen,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text('Accept ${formatUgx(estimated)}'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, 'propose'),
+                  child: const Text('Propose different fare'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Not now'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'propose') {
+      await _proposeFare(delivery, estimated);
+      return;
+    }
     setState(() => _busy = true);
     try {
       await _pushLiveLocation();
       await ref.read(ridersRepositoryProvider).claimDelivery(id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Delivery claimed')),
+          const SnackBar(content: Text('Delivery claimed at suggested fare')),
+        );
+        _reload();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _proposeFare(Map<String, dynamic> delivery, double suggested) async {
+    final id = delivery['id']?.toString();
+    if (id == null) return;
+    final feeCtrl = TextEditingController(text: suggested.round().toString());
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Propose new fare'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Suggested ${formatUgx(suggested)}. Must stay within Wamu limits.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: feeCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Proposed fare (UGX)',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                hintText: 'e.g. heavy traffic, difficult access',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send offer')),
+        ],
+      ),
+    );
+    final proposed = double.tryParse(feeCtrl.text.trim());
+    final reason = reasonCtrl.text.trim();
+    feeCtrl.dispose();
+    reasonCtrl.dispose();
+    if (ok != true || proposed == null || proposed <= 0 || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _pushLiveLocation();
+      await ref.read(ridersRepositoryProvider).proposeFareOffer(
+            deliveryId: id,
+            proposedFee: proposed,
+            reason: reason.isEmpty ? null : reason,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fare offer sent — waiting for customer')),
         );
         _reload();
       }
@@ -457,6 +580,7 @@ class _DeliveryWorkbenchScreenState extends ConsumerState<DeliveryWorkbenchScree
                   ...data.open.map((d) {
                     final fee = d['fee'];
                     final feeLabel = fee is num ? formatUgx(fee.toDouble()) : '$fee';
+                    final km = d['distance_km'];
                     final shopName = d['shop_name']?.toString();
                     return Card(
                       color: AppTheme.accentGreen.withValues(alpha: 0.08),
@@ -470,10 +594,14 @@ class _DeliveryWorkbenchScreenState extends ConsumerState<DeliveryWorkbenchScree
                               '${shopName != null && shopName.isNotEmpty ? '$shopName · ' : ''}'
                               '${d['pickup_address'] ?? 'Pickup'} → ${d['dropoff_address'] ?? 'Dropoff'}',
                             ),
-                            Text('Fee $feeLabel'),
+                            Text(
+                              'Suggested $feeLabel'
+                              '${km != null ? ' · ~$km km' : ''}',
+                            ),
                             const SizedBox(height: 8),
                             Wrap(
                               spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 OutlinedButton.icon(
                                   onPressed: () => openMapsNavigation(
@@ -484,15 +612,37 @@ class _DeliveryWorkbenchScreenState extends ConsumerState<DeliveryWorkbenchScree
                                   icon: const Icon(Icons.storefront, size: 18),
                                   label: const Text('Preview shop map'),
                                 ),
-                                if (!_busy)
+                                if (!_busy) ...[
                                   FilledButton(
                                     onPressed: () => _claim(d),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: AppTheme.accentGreen,
                                       foregroundColor: Colors.black,
                                     ),
-                                    child: const Text('Claim'),
+                                    child: const Text('Accept fare'),
                                   ),
+                                  OutlinedButton(
+                                    onPressed: () {
+                                      final suggested = fee is num
+                                          ? fee.toDouble()
+                                          : double.tryParse('$fee') ?? 0;
+                                      _proposeFare(d, suggested);
+                                    },
+                                    child: const Text('Propose fare'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Skipped — order stays open for other riders',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Decline'),
+                                  ),
+                                ],
                               ],
                             ),
                           ],

@@ -403,6 +403,13 @@ async def ensure_delivery_for_paid_order(db: AsyncSession, order: Order) -> Deli
     )
     db.add(delivery)
     await _apply_real_dropoff(db, delivery, order)
+    try:
+        from app.services.delivery_fare import apply_fare_snapshot_to_delivery
+
+        await apply_fare_snapshot_to_delivery(db, delivery, order)
+    except Exception:
+        delivery.estimated_fee = delivery.fee
+        delivery.agreed_fee = delivery.fee
     if rider:
         rider.delivery_count = (rider.delivery_count or 0) + 1
         db.add(

@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/network/api_error.dart';
 import '../../shared/models/business_model.dart';
+import '../../shared/utils/json_numbers.dart';
 import '../../shared/utils/ugx_formatter.dart';
 import '../../shared/widgets/momo_otp_dialog.dart';
 import '../../shared/widgets/wamu_network_image.dart';
@@ -12,9 +16,8 @@ import '../auth/auth_provider.dart';
 import '../cart/cart_provider.dart';
 import '../home/catalog_repository.dart';
 import '../../shared/models/order_model.dart';
+import '../move/riders_repository.dart';
 import '../orders/orders_repository.dart';
-
-const _deliveryFee = 5000.0;
 
 /// Cart — photos, shop context, pickup/delivery, and Mobile Money checkout.
 class CartScreen extends ConsumerStatefulWidget {
@@ -32,20 +35,92 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   final Map<String, BusinessModel> _shops = {};
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
+  Timer? _quoteDebounce;
+  bool _quoting = false;
+  String? _quoteError;
+  double _quotedFee = 0;
+  double? _quotedDistanceKm;
+  String? _quoteSource;
 
   @override
   void initState() {
     super.initState();
     final phone = ref.read(authProvider).user?.phone ?? '+256';
     _phoneController.text = phone;
+    _addressController.addListener(_onAddressChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _hydrateDetails());
   }
 
   @override
   void dispose() {
+    _quoteDebounce?.cancel();
+    _addressController.removeListener(_onAddressChanged);
     _addressController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  void _onAddressChanged() {
+    if (_fulfillment != 'DELIVERY') return;
+    _quoteDebounce?.cancel();
+    _quoteDebounce = Timer(const Duration(milliseconds: 650), _refreshFareQuote);
+  }
+
+  Future<void> _refreshFareQuote() async {
+    if (_fulfillment != 'DELIVERY') return;
+    final address = _addressController.text.trim();
+    if (address.length < 8) {
+      if (mounted) {
+        setState(() {
+          _quotedFee = 0;
+          _quotedDistanceKm = null;
+          _quoteError = null;
+          _quoteSource = null;
+        });
+      }
+      return;
+    }
+    final shopIds = ref.read(cartProvider.notifier).shopIds;
+    if (shopIds.isEmpty) return;
+    setState(() {
+      _quoting = true;
+      _quoteError = null;
+    });
+    try {
+      final repo = ref.read(ridersRepositoryProvider);
+      var totalFee = 0.0;
+      var totalKm = 0.0;
+      var anyKm = false;
+      String? source;
+      for (final bizId in shopIds) {
+        final q = await repo.quoteDeliveryFare(
+          businessId: bizId,
+          deliveryAddress: address,
+        );
+        totalFee += parseDoubleOrZero(q['estimated_fare_ugx']);
+        final km = parseDoubleOrZero(q['distance_km']);
+        if (km > 0) {
+          totalKm += km;
+          anyKm = true;
+        }
+        source ??= q['distance_source']?.toString();
+      }
+      if (!mounted) return;
+      setState(() {
+        _quotedFee = totalFee;
+        _quotedDistanceKm = anyKm ? totalKm : null;
+        _quoteSource = source;
+        _quoting = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _quoting = false;
+        _quoteError = apiErrorMessage(e, fallback: 'Could not estimate delivery fare');
+        _quotedFee = 0;
+        _quotedDistanceKm = null;
+      });
+    }
   }
 
   Future<void> _hydrateDetails() async {
@@ -81,6 +156,18 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     if (_fulfillment == 'DELIVERY' && _addressController.text.trim().length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add a delivery address in Kampala')),
+      );
+      return;
+    }
+    if (_fulfillment == 'DELIVERY' && (_quoting || _quotedFee <= 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _quoting
+                ? 'Wait for the delivery fare estimate…'
+                : (_quoteError ?? 'Enter an address to get a delivery fare estimate'),
+          ),
+        ),
       );
       return;
     }
@@ -193,7 +280,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final items = ref.watch(cartProvider);
     final cart = ref.read(cartProvider.notifier);
     final subtotal = ref.watch(cartTotalProvider);
-    final delivery = _fulfillment == 'DELIVERY' ? _deliveryFee : 0.0;
+    final delivery = _fulfillment == 'DELIVERY' ? _quotedFee : 0.0;
     final total = subtotal + delivery;
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
@@ -317,8 +404,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         icon: Icons.delivery_dining,
                         title: 'Delivery',
                         subtitle: 'Rider brings it',
-                        badge: formatUgx(_deliveryFee),
-                        onTap: () => setState(() => _fulfillment = 'DELIVERY'),
+                        badge: _fulfillment == 'DELIVERY' && _quotedFee > 0
+                            ? formatUgx(_quotedFee)
+                            : 'Quote',
+                        onTap: () {
+                          setState(() => _fulfillment = 'DELIVERY');
+                          _refreshFareQuote();
+                        },
                       ),
                     ),
                   ],
@@ -336,6 +428,54 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       fillColor: dark ? AppTheme.messengerElevated : const Color(0xFFF4F1EC),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  if (_quoting)
+                    const Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 10),
+                        Text('Calculating road distance & fare…'),
+                      ],
+                    )
+                  else if (_quoteError != null)
+                    Text(
+                      _quoteError!,
+                      style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFFC0392B)),
+                    )
+                  else if (_quotedFee > 0)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentGreen.withValues(alpha: dark ? 0.14 : 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Estimated delivery ${formatUgx(_quotedFee)}',
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          if (_quotedDistanceKm != null)
+                            Text(
+                              'Road distance ~${_quotedDistanceKm!.toStringAsFixed(1)} km'
+                              '${_quoteSource != null ? ' · $_quoteSource' : ''}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          Text(
+                            'Rider may propose a different fare within Wamu limits — you approve before it applies.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.messengerMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
                 const SizedBox(height: 22),
                 Text('Pay with Mobile Money', style: theme.textTheme.titleMedium),
@@ -350,17 +490,27 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         onTap: _loading ? null : () => setState(() => _provider = 'MTN'),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _PayTile(
-                        selected: _provider == 'AIRTEL',
-                        title: 'Airtel Money',
-                        color: const Color(0xFFE4002B),
-                        onTap: _loading ? null : () => setState(() => _provider = 'AIRTEL'),
+                    if (AppConfig.momoAirtelEnabled) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _PayTile(
+                          selected: _provider == 'AIRTEL',
+                          title: 'Airtel Money',
+                          color: const Color(0xFFE4002B),
+                          onTap: _loading ? null : () => setState(() => _provider = 'AIRTEL'),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
+                if (!AppConfig.momoAirtelEnabled)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Pay with MTN MoMo on this release. Airtel Money will return when our server is on a fixed IP.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.messengerMuted),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _phoneController,

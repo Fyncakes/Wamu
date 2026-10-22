@@ -68,6 +68,7 @@ class OrderItemResponse(BaseModel):
     quantity: int
     unit_price: Decimal
     subtotal: Decimal
+    image_url: str | None = None
 
 
 class OrderResponse(BaseModel):
@@ -89,6 +90,8 @@ class OrderResponse(BaseModel):
     created_at: datetime | None = None
     payment_status: str | None = None
     payment_provider: str | None = None
+    business_name: str | None = None
+    business_logo_url: str | None = None
 
     @model_validator(mode="wrap")
     @classmethod

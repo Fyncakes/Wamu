@@ -1,4 +1,6 @@
-# WAMU Payments — Staging MoMo (MTN / Airtel)
+# WAMU Payments — Staging MoMo (MTN first; Airtel later)
+
+**Railway / public staging:** use MTN sandbox or payment mocks — [`MTN_RAILWAY_LAUNCH.md`](./MTN_RAILWAY_LAUNCH.md). Defer Airtel until fixed egress (see [`AIRTEL_PORTAL_CHECKLIST.md`](./AIRTEL_PORTAL_CHECKLIST.md)).
 
 **Principle:** Wamu never custodies funds. Collections go through licensed providers; SUCCESS only from verified webhooks or provider API.
 

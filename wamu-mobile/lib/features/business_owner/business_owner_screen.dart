@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/network/api_client.dart';
+import '../../core/theme/app_theme.dart';
 import '../../shared/models/business_model.dart';
 import '../../shared/models/category_model.dart';
 import '../../shared/models/order_model.dart';
@@ -21,7 +23,6 @@ import '../businesses/favorites_repository.dart';
 import '../home/catalog_repository.dart';
 import '../move/riders_repository.dart';
 import '../orders/orders_repository.dart';
-import '../../core/network/api_client.dart';
 import 'owner_products_repository.dart';
 
 /// Business owner hub.
@@ -1221,6 +1222,27 @@ class _ManageOrdersScreenState extends ConsumerState<ManageOrdersScreen>
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 56,
+                              height: 56,
+                              child: order.previewImageUrl != null
+                                  ? WamuNetworkImage(
+                                      imageUrl: order.previewImageUrl,
+                                      width: 56,
+                                      height: 56,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : ColoredBox(
+                                      color: AppTheme.accentGreen.withValues(alpha: 0.12),
+                                      child: const Icon(
+                                        Icons.receipt_long,
+                                        color: AppTheme.accentGreen,
+                                      ),
+                                    ),
+                            ),
+                          ),
                           title: Text('${formatUgx(order.total)} · ${order.status}'),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

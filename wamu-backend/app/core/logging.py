@@ -36,12 +36,17 @@ def setup_logging(debug: bool = False) -> None:
         "sqlalchemy.engine",
         "sqlalchemy.engine.Engine",
         "sqlalchemy.pool",
+        "sqlalchemy.dialects",
         "aiosqlite",
         "httpx",
         "httpcore",
         "asyncio",
     ):
-        logging.getLogger(noisy).setLevel(logging.WARNING)
+        log = logging.getLogger(noisy)
+        log.setLevel(logging.WARNING)
+        log.propagate = True
+        # Drop handlers SQLAlchemy may attach when echo=True historically.
+        log.handlers.clear()
 
 
 def new_request_id() -> str:

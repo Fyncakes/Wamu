@@ -270,7 +270,113 @@ async def claim_delivery(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Accept the suggested delivery fare and claim the job."""
     return await riders_service.claim_delivery(db, user, delivery_id)
+
+
+class DeliveryFareQuoteRequest(BaseModel):
+    business_id: UUID
+    delivery_address: str = Field(min_length=8, max_length=400)
+
+
+class FareOfferCreate(BaseModel):
+    proposed_fee: float = Field(gt=0)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class RiderPricingPrefsUpdate(BaseModel):
+    preferred_min_per_km_ugx: float | None = Field(default=None, ge=0)
+
+
+@router.post("/deliveries/quote")
+async def quote_delivery_fare(
+    body: DeliveryFareQuoteRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Road-distance delivery fare estimate (shown before customer confirms)."""
+    _ = user
+    from app.services import delivery_fare as fare_svc
+
+    return await fare_svc.quote_delivery_fare(
+        db, business_id=body.business_id, delivery_address=body.delivery_address
+    )
+
+
+@router.get("/deliveries/fare-config")
+async def public_fare_config(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = user
+    from app.services import delivery_fare as fare_svc
+
+    cfg = await fare_svc.get_fare_config(db)
+    return cfg.to_dict()
+
+
+@router.patch("/riders/me/pricing")
+async def patch_rider_pricing_prefs(
+    body: RiderPricingPrefsUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from decimal import Decimal
+
+    from app.services import delivery_fare as fare_svc
+
+    return await fare_svc.update_rider_pricing_prefs(
+        db,
+        user,
+        preferred_min_per_km_ugx=(
+            Decimal(str(body.preferred_min_per_km_ugx))
+            if body.preferred_min_per_km_ugx is not None
+            else None
+        ),
+    )
+
+
+@router.post("/deliveries/{delivery_id}/fare-offers")
+async def propose_delivery_fare(
+    delivery_id: UUID,
+    body: FareOfferCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Rider counteroffer — customer must accept via API (chat is display only)."""
+    from decimal import Decimal
+
+    from app.services import delivery_fare as fare_svc
+
+    return await fare_svc.propose_fare_offer(
+        db,
+        user,
+        delivery_id,
+        proposed_fee=Decimal(str(body.proposed_fee)),
+        reason=body.reason,
+    )
+
+
+@router.post("/deliveries/fare-offers/{offer_id}/accept")
+async def accept_fare_offer(
+    offer_id: UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import delivery_fare as fare_svc
+
+    return await fare_svc.resolve_fare_offer(db, user, offer_id, accept=True)
+
+
+@router.post("/deliveries/fare-offers/{offer_id}/decline")
+async def decline_fare_offer(
+    offer_id: UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import delivery_fare as fare_svc
+
+    return await fare_svc.resolve_fare_offer(db, user, offer_id, accept=False)
 
 
 @router.get("/deliveries/by-order/{order_id}", response_model=DeliveryResponse)

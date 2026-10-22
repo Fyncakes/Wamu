@@ -92,6 +92,12 @@ String? notificationDeepLink({
     case 'DELIVERY_ASSIGNED':
       final orderId = id('order_id');
       return orderId == null ? null : '/orders/$orderId';
+    case 'FARE_OFFER':
+    case 'FARE_OFFER_ACCEPTED':
+    case 'FARE_OFFER_DECLINED':
+    case 'FARE_OFFER_EXPIRED':
+      final orderId = id('order_id');
+      return orderId == null ? null : '/orders/$orderId';
     case 'ORDER_DISPUTE':
       final audience = (data['audience']?.toString() ?? '').toLowerCase();
       if (audience == 'merchant') return '/business-owner/orders';

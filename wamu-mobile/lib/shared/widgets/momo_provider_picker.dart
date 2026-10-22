@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Shared MTN / Airtel Mobile Money picker used by cart, chat ORDER_CARD, and Orders retry.
@@ -21,19 +22,25 @@ class MomoProviderPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<String>(
-      segments: [
-        ButtonSegment(
-          value: 'MTN',
-          label: Text(compact ? 'MTN' : 'MTN MoMo'),
-          icon: compact ? null : const Icon(Icons.phone_android, size: 16),
-        ),
+    final segments = <ButtonSegment<String>>[
+      ButtonSegment(
+        value: 'MTN',
+        label: Text(compact ? 'MTN' : 'MTN MoMo'),
+        icon: compact ? null : const Icon(Icons.phone_android, size: 16),
+      ),
+    ];
+    if (AppConfig.momoAirtelEnabled) {
+      segments.add(
         ButtonSegment(
           value: 'AIRTEL',
           label: Text(compact ? 'Airtel' : 'Airtel Money'),
           icon: compact ? null : const Icon(Icons.phone_iphone, size: 16),
         ),
-      ],
+      );
+    }
+
+    return SegmentedButton<String>(
+      segments: segments,
       selected: {value},
       onSelectionChanged: enabled
           ? (s) {

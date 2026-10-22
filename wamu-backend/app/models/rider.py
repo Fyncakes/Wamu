@@ -111,6 +111,8 @@ class RiderProfile(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     # MoMo / Airtel destination for delivery-fee disbursements
     payout_phone: Mapped[str | None] = mapped_column(String(20))
     payout_provider: Mapped[str | None] = mapped_column(String(20))  # MTN | AIRTEL | MOCK
+    # Preferred minimum earning per km (clamped by admin cap)
+    preferred_min_per_km_ugx: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
 
     # Admin review
     admin_note: Mapped[str | None] = mapped_column(Text)
@@ -178,8 +180,53 @@ class Delivery(UUIDMixin, TimestampMixin, Base):
     delivery_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True
     )
+    # Distance-based fare audit trail
+    distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
+    estimated_fee: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    agreed_fee: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    fare_rule_snapshot: Mapped[dict | None] = mapped_column(JSON)
 
     order = relationship("Order")
+    rider = relationship("RiderProfile")
+
+
+class DeliveryFareOfferStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+
+
+class DeliveryFareOffer(UUIDMixin, TimestampMixin, Base):
+    """Rider counteroffer on a delivery fare — customer must approve via API (not chat text)."""
+
+    __tablename__ = "delivery_fare_offers"
+
+    delivery_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("deliveries.id"), nullable=False, index=True
+    )
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False, index=True
+    )
+    rider_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("rider_profiles.id"), nullable=False, index=True
+    )
+    proposed_fee: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    original_fee: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="UGX")
+    reason: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=DeliveryFareOfferStatus.PENDING.value
+    )
+    distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
+    delivery = relationship("Delivery")
     rider = relationship("RiderProfile")
 
 

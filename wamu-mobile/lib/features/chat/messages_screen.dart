@@ -38,6 +38,7 @@ import '../business_owner/owner_products_repository.dart';
 import '../calls/active_call_screen.dart';
 import '../calls/calls_repository.dart';
 import '../home/catalog_repository.dart';
+import '../move/riders_repository.dart';
 import '../orders/orders_repository.dart';
 import 'chat_image_editor.dart';
 import 'chat_media_grid.dart';
@@ -2845,6 +2846,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (del.isNotEmpty) return '🧾 Order · $del';
       return '🧾 Order · Paid';
     }
+    if (t == 'FARE_OFFER') {
+      final card = _parseFareOffer(msg);
+      final status = (card?['status']?.toString() ?? 'PENDING').toUpperCase();
+      final fee = double.tryParse('${card?['proposed_fee']}') ?? 0;
+      return '🛵 Fare offer · ${formatUgx(fee)} · $status';
+    }
     if (t == 'DOCUMENT') {
       final name =
           msg.content.replaceFirst(RegExp(r'^↪\s*'), '').replaceFirst('📄', '').trim();
@@ -2861,6 +2868,150 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (raw is Map) return Map<String, dynamic>.from(raw);
     } catch (_) {}
     return null;
+  }
+
+  Map<String, dynamic>? _parseFareOffer(ChatMessageModel msg) {
+    if (msg.messageType != 'FARE_OFFER') return null;
+    try {
+      final raw = jsonDecode(msg.content);
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _resolveFareOffer(Map<String, dynamic> card, {required bool accept}) async {
+    final offerId = card['offer_id']?.toString();
+    if (offerId == null || offerId.isEmpty) return;
+    setState(() => _ordering = true);
+    try {
+      final repo = ref.read(ridersRepositoryProvider);
+      if (accept) {
+        await repo.acceptFareOffer(offerId);
+      } else {
+        await repo.declineFareOffer(offerId);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(accept ? 'New delivery fare accepted' : 'Fare offer declined'),
+        ),
+      );
+      await _bootstrap();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(apiErrorMessage(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _ordering = false);
+    }
+  }
+
+  Widget _fareOfferBubble(ChatMessageModel msg) {
+    final card = _parseFareOffer(msg);
+    if (card == null) {
+      return const Text('Fare offer', style: TextStyle(fontWeight: FontWeight.w600));
+    }
+    final proposed = double.tryParse('${card['proposed_fee']}') ?? 0;
+    final original = double.tryParse('${card['original_fee']}') ?? 0;
+    final status = (card['status']?.toString() ?? 'PENDING').toUpperCase();
+    final km = card['distance_km'];
+    final reason = card['reason']?.toString();
+    final pending = status == 'PENDING';
+    final canAct = pending && !msg.isMine && !_isMerchantInChat && !_ordering;
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.78,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF1A2430)
+            : const Color(0xFFF5F8FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueGrey.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Delivery fare offer',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+              ),
+              Text(
+                status,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: status == 'ACCEPTED'
+                      ? AppTheme.accentGreen
+                      : status == 'DECLINED' || status == 'EXPIRED'
+                          ? const Color(0xFFC0392B)
+                          : AppTheme.messengerMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            formatUgx(proposed),
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: AppTheme.accentGreen,
+            ),
+          ),
+          Text(
+            'Was ${formatUgx(original)}'
+            '${km != null ? ' · ~$km km road' : ''}',
+            style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted),
+          ),
+          if ((card['pickup_address'] ?? card['dropoff_address']) != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${card['pickup_address'] ?? 'Pickup'} → ${card['dropoff_address'] ?? 'Dropoff'}',
+              style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted, height: 1.3),
+            ),
+          ],
+          if (reason != null && reason.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(reason, style: const TextStyle(fontSize: 13)),
+          ],
+          if (canAct) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => _resolveFareOffer(card, accept: true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.accentGreen,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Accept'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _resolveFareOffer(card, accept: false),
+                    child: const Text('Decline'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Acceptance is recorded by Wamu — chat text alone is not enough.',
+              style: TextStyle(fontSize: 11, color: AppTheme.messengerMuted),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _payOrderCard(Map<String, dynamic> card) async {
@@ -3205,6 +3356,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (msg.messageType == 'ORDER_CARD') {
       return _orderCardBubble(msg);
     }
+    if (msg.messageType == 'FARE_OFFER') {
+      return _fareOfferBubble(msg);
+    }
     final dark = theme.brightness == Brightness.dark;
     final onMine = msg.isMine
         ? (dark ? Colors.white : const Color(0xFF111B21))
@@ -3496,6 +3650,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     child: Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: _orderCardBubble(msg),
+                                    ),
+                                  );
+                                }
+                                if (msg.messageType == 'FARE_OFFER') {
+                                  return Align(
+                                    alignment: msg.isMine
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: _fareOfferBubble(msg),
                                     ),
                                   );
                                 }

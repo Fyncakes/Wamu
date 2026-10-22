@@ -27,6 +27,7 @@ class MessageType(str, enum.Enum):
     DOCUMENT = "DOCUMENT"
     SYSTEM = "SYSTEM"
     ORDER_CARD = "ORDER_CARD"
+    FARE_OFFER = "FARE_OFFER"
 
 
 class Conversation(UUIDMixin, TimestampMixin, Base):

@@ -66,6 +66,57 @@ class RidersRepository {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+  /// Road-distance fare estimate before checkout.
+  Future<Map<String, dynamic>> quoteDeliveryFare({
+    required String businessId,
+    required String deliveryAddress,
+  }) async {
+    final response = await _client.post('/deliveries/quote', data: {
+      'business_id': businessId,
+      'delivery_address': deliveryAddress,
+    });
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> fareConfig() async {
+    final response = await _client.get('/deliveries/fare-config');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> updatePricingPrefs({
+    double? preferredMinPerKmUgx,
+  }) async {
+    final response = await _client.patch('/riders/me/pricing', data: {
+      'preferred_min_per_km_ugx': preferredMinPerKmUgx,
+    });
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> proposeFareOffer({
+    required String deliveryId,
+    required double proposedFee,
+    String? reason,
+  }) async {
+    final response = await _client.post(
+      '/deliveries/$deliveryId/fare-offers',
+      data: {
+        'proposed_fee': proposedFee,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> acceptFareOffer(String offerId) async {
+    final response = await _client.post('/deliveries/fare-offers/$offerId/accept');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> declineFareOffer(String offerId) async {
+    final response = await _client.post('/deliveries/fare-offers/$offerId/decline');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<Map<String, dynamic>> advanceDelivery(
     String deliveryId,
     String status, {

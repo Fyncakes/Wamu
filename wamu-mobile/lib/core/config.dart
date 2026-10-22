@@ -17,6 +17,10 @@ class AppConfig {
   static const String apiHostOverride = String.fromEnvironment('API_HOST');
   static const String apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
+  /// Railway / MTN-first launch: hide Airtel Money in checkout unless enabled at build time.
+  static const bool momoAirtelEnabled =
+      bool.fromEnvironment('MOMO_AIRTEL_ENABLED', defaultValue: false);
+
   static const int apiPort = 8000;
   static const String apiPath = '/api/v1';
 
