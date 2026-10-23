@@ -236,6 +236,29 @@ async def api_root():
     }
 
 
+_DEFAULT_APK_URL = (
+    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-phone.apk"
+)
+
+
+@app.get("/get")
+@app.get("/download")
+async def download_app_page():
+    """Public install page. Share this link; the button downloads the Android app."""
+    import os
+
+    apk = os.environ.get("PHONE_APK_URL", "").strip() or _DEFAULT_APK_URL
+    template = Path(__file__).resolve().parent / "templates" / "get.html"
+    if template.is_file():
+        html = template.read_text(encoding="utf-8").replace("__APK__", apk)
+    else:
+        html = (
+            "<!DOCTYPE html><html><body><h1>Wamu</h1>"
+            f'<p><a href="{apk}">Download Wamu</a></p></body></html>'
+        )
+    return HTMLResponse(html)
+
+
 @app.get("/connect")
 async def connect_page(request: Request):
     """Phone setup page with QR — scan from the Wamu app to link this server."""
@@ -286,5 +309,6 @@ else:
             "docs": "/docs",
             "health": "/api/v1/health",
             "connect": "/connect",
-            "hint": "Open /connect on the phone to copy the API URL into the APK",
+            "download": "/get",
+            "hint": "Share /get to install the Android app",
         }
