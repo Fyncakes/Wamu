@@ -1,0 +1,162 @@
+# Wamu on DigitalOcean Droplet — API + Celery + Postgres + Redis + MinIO + Caddy
+# On the droplet:
+#   cd /opt/wamu/infrastructure/digitalocean
+#   docker compose --env-file .env.do up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wamu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: wamu
+    volumes:
+      - wamu_do_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wamu -d wamu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-wamuadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - wamu_do_minio:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 $${S3_ACCESS_KEY:-wamuadmin} $${S3_SECRET_KEY};
+      mc mb -p local/$${S3_BUCKET:-wamu-media} || true;
+      exit 0;
+      "
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-wamuadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-wamu-media}
+
+  api:
+    build:
+      context: ../../wamu-backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.do
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wamu:${POSTGRES_PASSWORD}@postgres:5432/wamu
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      S3_ENABLED: "true"
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_PUBLIC_URL: ${PUBLIC_API_BASE}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-wamuadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-wamu-media}
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../../wamu-backend
+      dockerfile: Dockerfile
+    command: celery -A app.workers.celery_app.celery_app worker -l info
+    env_file:
+      - .env.do
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wamu:${POSTGRES_PASSWORD}@postgres:5432/wamu
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      S3_ENABLED: "true"
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_PUBLIC_URL: ${PUBLIC_API_BASE}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-wamuadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-wamu-media}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ../../wamu-backend
+      dockerfile: Dockerfile
+    command: celery -A app.workers.celery_app.celery_app beat -l info
+    env_file:
+      - .env.do
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wamu:${POSTGRES_PASSWORD}@postgres:5432/wamu
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      WAMU_DOMAIN: ${WAMU_DOMAIN:-api.wamu.ug}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - wamu_do_caddy_data:/data
+      - wamu_do_caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  wamu_do_pg:
+  wamu_do_minio:
+  wamu_do_caddy_data:
+  wamu_do_caddy_config:

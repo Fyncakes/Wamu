@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-from migrations.helpers import column_exists, table_exists
+from migrations.helpers import check_constraint_exists, column_exists, table_exists
 
 revision = "0005_platform_fee"
 down_revision = "0004_merchant_payouts"
@@ -31,15 +31,14 @@ def upgrade() -> None:
             "merchant_payouts",
             sa.Column("fee_bps", sa.Integer(), nullable=False, server_default="0"),
         )
-    # Check may already exist from create_all — ignore duplicate
-    try:
+    # create_all already adds this check. A failed ADD aborts the Postgres
+    # transaction, so a try/except cannot swallow it.
+    if not check_constraint_exists("merchant_payouts", "merchant_payouts_fee_nonneg"):
         op.create_check_constraint(
             "merchant_payouts_fee_nonneg",
             "merchant_payouts",
             "platform_fee >= 0",
         )
-    except Exception:
-        pass
 
 
 def downgrade() -> None:

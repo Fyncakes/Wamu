@@ -126,11 +126,11 @@ class _AdminHubScreenState extends ConsumerState<AdminHubScreen>
               ),
               const SizedBox(height: 8),
               const Text(
-                'This account is not an admin. Log out, then sign in with the demo admin number to manage riders and shops.',
+                'This account is not an admin. Log out, then sign in with the admin phone. The verification code arrives by SMS.',
               ),
               const SizedBox(height: 16),
               const SelectableText(
-                '+256700000001\nOTP 123456',
+                '+256700000001',
                 style: TextStyle(fontWeight: FontWeight.w700, height: 1.4),
               ),
               const SizedBox(height: 20),
@@ -190,7 +190,7 @@ class _AdminHubScreenState extends ConsumerState<AdminHubScreen>
           }
           if (snap.hasError && _latest == null) {
             final msg = isAdminApiError(snap.error!)
-                ? 'Admin API denied. Log in as +256700000001 (OTP 123456).'
+                ? 'Admin API denied. Log in as +256700000001 with the SMS code.'
                 : '${snap.error}';
             return ErrorView(message: msg, onRetry: _reload);
           }

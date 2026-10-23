@@ -229,7 +229,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       ? 'Payment failed'
                       : s == 'OTP'
                           ? 'Enter $_provider MoMo code…'
-                          : 'Confirming $_provider payment… ($s)';
+                          : _provider == 'MTN' &&
+                                  (s == 'PENDING' || s == 'PROCESSING')
+                              ? 'Approve payment on your MTN MoMo phone…'
+                              : 'Confirming $_provider payment… ($s)';
             });
           },
         );

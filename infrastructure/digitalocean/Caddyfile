@@ -1,0 +1,4 @@
+{$WAMU_DOMAIN:api.wamu.ug} {
+	encode gzip
+	reverse_proxy api:8000
+}

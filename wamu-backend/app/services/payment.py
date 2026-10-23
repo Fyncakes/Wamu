@@ -66,7 +66,7 @@ def payment_to_response(payment: Payment, *, mock_hint: str | None = None) -> Pa
 
 
 async def _issue_payment_otp(db: AsyncSession, payment: Payment) -> str | None:
-    """Create a Wamu MoMo OTP for this payment. Returns mock_hint when mock OTP is on."""
+    """Create a Wamu MoMo OTP and send it by SMS. Never return the code."""
     settings = get_settings()
     phone = payment.phone
     if not phone:
@@ -92,7 +92,7 @@ async def _issue_payment_otp(db: AsyncSession, payment: Payment) -> str | None:
         await get_sms_provider().send_otp(phone, code)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return code if settings.otp_mock_mode else None
+    return None
 
 
 async def finalize_payment_success(
@@ -312,9 +312,8 @@ async def confirm_payment_otp(
 
     challenge.attempts += 1
     if hash_token(code) != challenge.code_hash:
-        if not (settings.otp_mock_mode and code == settings.otp_mock_code):
-            await db.flush()
-            raise HTTPException(status_code=400, detail="Invalid MoMo OTP")
+        await db.flush()
+        raise HTTPException(status_code=400, detail="Invalid MoMo OTP")
 
     challenge.consumed_at = now
     payment.status = PaymentStatus.SUCCESS.value

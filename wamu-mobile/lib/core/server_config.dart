@@ -35,14 +35,21 @@ class ServerConfig {
   }
 
   static Future<void> hydrate(SecureStorageService storage) async {
+    // A build baked with API_BASE_URL (Railway) wins over a laptop or tunnel
+    // address saved by an older install.
+    if (AppConfig.apiBaseUrlOverride.isNotEmpty) {
+      apiBaseUrl = normalizeApiBaseUrl(AppConfig.apiBaseUrlOverride);
+      _userConfigured = true;
+      correctWebDevServerUrl();
+      return;
+    }
     final saved = await storage.read(_storageKey);
     if (saved != null && saved.trim().isNotEmpty) {
       apiBaseUrl = normalizeApiBaseUrl(saved);
       _userConfigured = true;
     } else {
       apiBaseUrl = AppConfig.compileTimeApiBaseUrl;
-      _userConfigured = AppConfig.apiBaseUrlOverride.isNotEmpty ||
-          AppConfig.apiHostOverride.isNotEmpty;
+      _userConfigured = AppConfig.apiHostOverride.isNotEmpty;
     }
     // flutter run -d chrome: never call the UI port for API (404).
     correctWebDevServerUrl();
@@ -89,9 +96,13 @@ class ServerConfig {
 
   static Future<void> clear(SecureStorageService storage) async {
     await storage.delete(_storageKey);
-    apiBaseUrl = AppConfig.compileTimeApiBaseUrl;
-    _userConfigured = AppConfig.apiBaseUrlOverride.isNotEmpty ||
-        AppConfig.apiHostOverride.isNotEmpty;
+    if (AppConfig.apiBaseUrlOverride.isNotEmpty) {
+      apiBaseUrl = normalizeApiBaseUrl(AppConfig.apiBaseUrlOverride);
+      _userConfigured = true;
+    } else {
+      apiBaseUrl = AppConfig.compileTimeApiBaseUrl;
+      _userConfigured = AppConfig.apiHostOverride.isNotEmpty;
+    }
     correctWebDevServerUrl();
   }
 }

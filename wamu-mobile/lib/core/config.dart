@@ -9,7 +9,6 @@ class AppConfig {
   static const String appName = 'WAMU';
   static const String tagline = "Uganda's Digital Home";
   static const String supportLine = 'Connect. Discover. Shop. Move. Grow.';
-  static const String mockOtp = '123456';
 
   static const String androidEmulatorHost = '10.0.2.2';
   static const String localhostHost = 'localhost';

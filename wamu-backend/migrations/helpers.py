@@ -30,3 +30,13 @@ def unique_constraint_exists(table: str, name: str) -> bool:
     if not table_exists(table):
         return False
     return any(uc["name"] == name for uc in _insp().get_unique_constraints(table))
+
+
+def check_constraint_exists(table: str, name: str) -> bool:
+    if not table_exists(table):
+        return False
+    try:
+        checks = _insp().get_check_constraints(table)
+    except NotImplementedError:
+        return False
+    return any(c.get("name") == name for c in checks)

@@ -53,7 +53,6 @@ async def request_otp(db: AsyncSession, phone: str) -> dict:
     return {
         "message": "OTP sent",
         "expires_in": settings.otp_expire_seconds,
-        "mock_hint": code if settings.otp_mock_mode else None,
     }
 
 
@@ -89,9 +88,8 @@ async def verify_otp(
 
     challenge.attempts += 1
     if hash_token(code) != challenge.code_hash:
-        if not (settings.otp_mock_mode and code == settings.otp_mock_code):
-            await db.flush()
-            raise HTTPException(status_code=400, detail="Invalid OTP")
+        await db.flush()
+        raise HTTPException(status_code=400, detail="Invalid OTP")
 
     challenge.consumed_at = datetime.now(timezone.utc)
 

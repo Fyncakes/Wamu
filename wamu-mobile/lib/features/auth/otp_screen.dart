@@ -104,7 +104,40 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ),
               onSubmitted: (_) => _verify(),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            Text(
+              'Check the SMS on your phone. Delivery can take up to a minute on MTN or Airtel.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.messengerMuted,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: _loading || _phone.isEmpty
+                  ? null
+                  : () async {
+                      setState(() => _loading = true);
+                      try {
+                        await ref.read(authProvider.notifier).requestOtp(_phone);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Code sent again')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$e')),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _loading = false);
+                      }
+                    },
+              child: const Text('Resend code'),
+            ),
+            const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _loading ? null : _verify,
               child: _loading

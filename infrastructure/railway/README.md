@@ -31,8 +31,10 @@ Trial projects are limited to **5 services per project**. This layout uses exact
 
 ### 1. Create project
 
-1. Open [Railway dashboard](https://railway.com/dashboard) → **New Project**.
-2. Prefer **Deploy from GitHub repo** and select **WAMU** (or your fork).
+1. Open [Railway dashboard](https://railway.com/dashboard) → **New** → **GitHub Repository** (or **New Project** → deploy from GitHub).
+2. Select **`Fyncakes/Wamu`** (search **`Wamu`** — the repo name is not “WAMU”).  
+   If the list is empty or you see **Configure GitHub App**, follow **[GITHUB_CONNECT.md](./GITHUB_CONNECT.md)**.  
+   **No GitHub?** Use CLI deploy from `wamu-backend`: `npx @railway/cli login` → `railway init` → `railway up` (same doc).
 
 ### 2. Add databases
 

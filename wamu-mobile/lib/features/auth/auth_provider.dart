@@ -13,19 +13,14 @@ class AuthRepository {
   final ApiClient _client;
   final SecureStorageService _storage;
 
-  Future<String?> requestOtp(String phone) async {
+  Future<void> requestOtp(String phone) async {
     try {
-      final response = await _client.post('/auth/request-otp', data: {'phone': phone});
+      await _client.post('/auth/request-otp', data: {'phone': phone});
       try {
         await _storage.savePhone(phone);
       } catch (_) {
         // Storage failures must not block login (common on LAN http web).
       }
-      final data = response.data;
-      if (data is Map && data['mock_hint'] != null) {
-        return data['mock_hint'].toString();
-      }
-      return null;
     } on DioException catch (e) {
       throw _mapDio(e, fallback: 'Failed to send OTP');
     }
@@ -243,17 +238,15 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 enum AuthStatus { unknown, unauthenticated, needsProfile, authenticated }
 
 class AuthState {
-  const AuthState({this.status = AuthStatus.unknown, this.user, this.mockOtpHint});
+  const AuthState({this.status = AuthStatus.unknown, this.user});
 
   final AuthStatus status;
   final UserModel? user;
-  final String? mockOtpHint;
 
-  AuthState copyWith({AuthStatus? status, UserModel? user, String? mockOtpHint}) {
+  AuthState copyWith({AuthStatus? status, UserModel? user}) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
-      mockOtpHint: mockOtpHint ?? this.mockOtpHint,
     );
   }
 }
@@ -284,8 +277,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> requestOtp(String phone) async {
-    final hint = await _repo.requestOtp(phone);
-    state = state.copyWith(mockOtpHint: hint);
+    await _repo.requestOtp(phone);
   }
 
   Future<void> verifyOtp(String phone, String code) async {

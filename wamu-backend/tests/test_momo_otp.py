@@ -144,7 +144,7 @@ async def test_momo_otp_confirm_success_airtel(env):
     assert body["status"] == "PROCESSING"
     assert body["otp_required"] is True
     assert body["provider"] == "AIRTEL"
-    assert body.get("mock_hint") == "123456"
+    assert not body.get("mock_hint")
     payment_id = body["id"]
 
     # Refresh must NOT skip the OTP gate.

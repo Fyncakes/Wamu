@@ -2,9 +2,11 @@
 
 One path from a clean machine to a healthy staging API. Product features stop here; this is the ship gate.
 
-## Hosted staging (Railway trial)
+## Hosted staging (DigitalOcean)
 
-For a public HTTPS API without running Docker on your laptop, use **[`infrastructure/railway/README.md`](../infrastructure/railway/README.md)** and **[`documentation/MTN_RAILWAY_LAUNCH.md`](./MTN_RAILWAY_LAUNCH.md)** (GitHub → Railway, MTN-first, mock OTP/payments for first demo). Run `./infrastructure/railway/bootstrap_env.sh` for generated secrets.
+Public HTTPS API on a Droplet: **[`infrastructure/digitalocean/README.md`](../infrastructure/digitalocean/README.md)** and **[`documentation/MTN_DIGITALOCEAN_LAUNCH.md`](./MTN_DIGITALOCEAN_LAUNCH.md)**. Run `./infrastructure/digitalocean/bootstrap_env.sh`, then `DO_HOST=root@IP ./infrastructure/digitalocean/deploy.sh`.
+
+(Railway path archived in `infrastructure/railway/` — not used while DO is the launch host.)
 
 ## Prerequisites (local Docker)
 

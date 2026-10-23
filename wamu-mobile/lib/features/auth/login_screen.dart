@@ -225,8 +225,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Demo OTP is 123456.',
-                    style: theme.textTheme.bodySmall,
+                    'We text a 6-digit code to your MTN or Airtel number.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: dark ? AppTheme.messengerMuted : AppTheme.warmBrown,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const Spacer(flex: 2),
