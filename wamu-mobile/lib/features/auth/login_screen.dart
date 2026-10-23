@@ -160,14 +160,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => context.push('/server-setup', extra: true),
-                      icon: const Icon(Icons.dns_outlined, size: 18),
-                      label: const Text('Wamu server'),
-                    ),
-                  ),
                   const Spacer(),
                   const WamuLogo(size: 96),
                   const SizedBox(height: 20),
@@ -225,7 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'We text a 6-digit code to your MTN or Airtel number.',
+                    'For this trial, the code is 123456.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: dark ? AppTheme.messengerMuted : AppTheme.warmBrown,
                     ),

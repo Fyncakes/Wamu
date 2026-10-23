@@ -189,6 +189,12 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
             onTap: () => context.push('/business-owner/videos'),
           ),
           _OwnerTile(
+            icon: Icons.image_outlined,
+            title: 'Shop cover photo',
+            subtitle: 'The wide image at the top of your shop',
+            onTap: () => context.push('/business-owner/settings'),
+          ),
+          _OwnerTile(
             icon: Icons.campaign_outlined,
             title: 'Promotions',
             subtitle: 'Storefront promo banner',

@@ -2,7 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev \
+# ffmpeg/ffprobe: phone clips are rejected without them ("Could not read video length").
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

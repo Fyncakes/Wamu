@@ -1,12 +1,17 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/api_error.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/utils/ugx_formatter.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
+import '../../shared/widgets/wamu_network_image.dart';
 
 /// Business overview — sales snapshot for the owner hub.
 class BusinessOverviewScreen extends ConsumerStatefulWidget {
@@ -322,8 +327,11 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
   final _phone = TextEditingController();
   final _desc = TextEditingController();
   final _promo = TextEditingController();
+  String? _businessId;
+  String? _coverUrl;
   bool _loading = true;
   bool _saving = false;
+  bool _uploadingCover = false;
 
   @override
   void initState() {
@@ -349,8 +357,11 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
       final mine = await ref.read(apiClientProvider).get('/businesses/mine');
       final list = (mine.data as List).cast<Map>();
       if (list.isNotEmpty) {
-        _phone.text = list.first['phone']?.toString() ?? '';
-        final desc = list.first['description']?.toString() ?? '';
+        final shop = Map<String, dynamic>.from(list.first);
+        _businessId = shop['id']?.toString();
+        _coverUrl = shop['cover_url']?.toString();
+        _phone.text = shop['phone']?.toString() ?? '';
+        final desc = shop['description']?.toString() ?? '';
         _desc.text = desc.contains('\nPROMO:') ? desc.split('\nPROMO:').first : desc;
         if (_promo.text.isEmpty && desc.contains('\nPROMO:')) {
           _promo.text = desc.split('\nPROMO:').last;
@@ -358,6 +369,62 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
       }
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _pickCover() async {
+    final businessId = _businessId;
+    if (businessId == null || businessId.isEmpty) return;
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (file == null) return;
+    setState(() => _uploadingCover = true);
+    try {
+      final bytes = await file.readAsBytes();
+      var filename = file.name.isNotEmpty ? file.name : 'cover.jpg';
+      final lower = filename.toLowerCase();
+      var contentType = 'image/jpeg';
+      if (lower.endsWith('.png') || (file.mimeType ?? '').contains('png')) {
+        contentType = 'image/png';
+        if (!lower.endsWith('.png')) filename = '$filename.png';
+      } else if (lower.endsWith('.webp') || (file.mimeType ?? '').contains('webp')) {
+        contentType = 'image/webp';
+        if (!lower.endsWith('.webp')) filename = '$filename.webp';
+      } else if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+        filename = '$filename.jpg';
+      }
+      final form = FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: MediaType.parse(contentType),
+        ),
+      });
+      final uploaded = await ref.read(apiClientProvider).dio.post('/media/upload', data: form);
+      final map = uploaded.data;
+      final url = map is Map ? map['url']?.toString() : null;
+      if (url == null || url.isEmpty) {
+        throw StateError('Upload returned no image URL');
+      }
+      await ref.read(apiClientProvider).patch(
+        '/businesses/$businessId',
+        data: {'cover_url': url},
+      );
+      if (!mounted) return;
+      setState(() => _coverUrl = url);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shop cover updated')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(apiErrorMessage(e, fallback: 'Could not update the shop cover'))),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
   }
 
   Future<void> _save() async {
@@ -388,6 +455,41 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                const Text(
+                  'Shop cover',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'This photo is the wide image at the top of your shop page.',
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    height: 150,
+                    width: double.infinity,
+                    child: (_coverUrl ?? '').trim().isEmpty
+                        ? ColoredBox(
+                            color: AppTheme.warmBrown.withValues(alpha: 0.12),
+                            child: const Center(child: Text('No cover photo yet')),
+                          )
+                        : WamuNetworkImage(imageUrl: _coverUrl, height: 150),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _uploadingCover ? null : _pickCover,
+                  icon: _uploadingCover
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_photo_alternate_outlined),
+                  label: Text(_uploadingCover ? 'Uploading…' : 'Upload cover photo'),
+                ),
+                const SizedBox(height: 24),
                 TextField(controller: _name, decoration: const InputDecoration(labelText: 'Shop name')),
                 const SizedBox(height: 12),
                 TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Business phone')),
@@ -427,11 +529,17 @@ class BusinessPromotionsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Set a storefront promo banner that customers see on your shop. '
-            'Use Business settings to edit the promo text.',
+            'The shop cover is the photo customers see across the top of your shop. '
+            'Promo text is a short line under that photo.',
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
+            onPressed: () => context.push('/business-owner/settings'),
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: const Text('Upload shop cover photo'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
             onPressed: () => context.push('/business-owner/settings'),
             icon: const Icon(Icons.campaign),
             label: const Text('Edit promo in settings'),

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -132,6 +133,11 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
         'file': MultipartFile.fromBytes(
           bytes,
           filename: file.name.isNotEmpty ? file.name : 'clip.mp4',
+          contentType: MediaType.parse(
+            (file.mimeType != null && file.mimeType!.startsWith('video/'))
+                ? file.mimeType!
+                : 'video/mp4',
+          ),
         ),
       });
       final response =
