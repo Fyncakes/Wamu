@@ -24,21 +24,28 @@ if [[ -n "${API_HOST:-}" ]]; then
 fi
 
 cd "$ROOT/wamu-mobile"
-# One file with armeabi-v7a and arm64-v8a so either phone can install it.
-flutter build apk --release "${DEFINES[@]}"
+# Separate files stay small enough to share. A 64-bit-only APK shows
+# "app isn't compatible with your phone" on 32-bit handsets.
+flutter build apk --release --split-per-abi \
+  --target-platform android-arm,android-arm64 \
+  "${DEFINES[@]}"
 
-APK="build/app/outputs/flutter-apk/app-release.apk"
-if [[ ! -f "$APK" ]]; then
-  echo "[apk] missing $APK" >&2
+ARM64="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+ARM32="build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk"
+if [[ ! -f "$ARM64" || ! -f "$ARM32" ]]; then
+  echo "[apk] missing split APKs" >&2
   exit 1
 fi
 
-cp -f "$APK" "$DIST/wamu-phone.apk"
 mkdir -p "$DIST/usb"
-cp -f "$APK" "$DIST/usb/wamu-phone.apk"
+cp -f "$ARM64" "$DIST/wamu-arm64.apk"
+cp -f "$ARM32" "$DIST/wamu-arm32.apk"
+cp -f "$ARM64" "$DIST/wamu-phone.apk"
+cp -f "$ARM64" "$DIST/usb/wamu-phone.apk"
+cp -f "$ARM32" "$DIST/usb/wamu-arm32.apk"
 rm -f "$ROOT/wamu-backend/media_uploads/wamu-phone.apk"
-ln "$DIST/wamu-phone.apk" "$ROOT/wamu-backend/media_uploads/wamu-phone.apk" 2>/dev/null \
-  || cp -f "$DIST/wamu-phone.apk" "$ROOT/wamu-backend/media_uploads/wamu-phone.apk"
+ln "$DIST/wamu-arm64.apk" "$ROOT/wamu-backend/media_uploads/wamu-phone.apk" 2>/dev/null \
+  || cp -f "$DIST/wamu-arm64.apk" "$ROOT/wamu-backend/media_uploads/wamu-phone.apk"
 
-SIZE=$(du -h "$DIST/wamu-phone.apk" | awk '{print $1}')
-echo "[apk] $DIST/wamu-phone.apk ($SIZE, 32-bit and 64-bit)"
+echo "[apk] $DIST/wamu-arm64.apk ($(du -h "$DIST/wamu-arm64.apk" | awk '{print $1}'), 64-bit)"
+echo "[apk] $DIST/wamu-arm32.apk ($(du -h "$DIST/wamu-arm32.apk" | awk '{print $1}'), 32-bit)"

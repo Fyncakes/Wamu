@@ -236,25 +236,35 @@ async def api_root():
     }
 
 
-_DEFAULT_APK_URL = (
-    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-phone.apk"
+_DEFAULT_APK64_URL = (
+    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm64.apk"
+)
+_DEFAULT_APK32_URL = (
+    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm32.apk"
 )
 
 
 @app.get("/get")
 @app.get("/download")
 async def download_app_page():
-    """Public install page. Share this link; the button downloads the Android app."""
+    """Public install page. Share this link; the buttons download the Android app."""
     import os
 
-    apk = os.environ.get("PHONE_APK_URL", "").strip() or _DEFAULT_APK_URL
+    apk64 = os.environ.get("PHONE_APK_URL", "").strip() or _DEFAULT_APK64_URL
+    apk32 = os.environ.get("PHONE_APK32_URL", "").strip() or _DEFAULT_APK32_URL
     template = Path(__file__).resolve().parent / "templates" / "get.html"
     if template.is_file():
-        html = template.read_text(encoding="utf-8").replace("__APK__", apk)
+        html = (
+            template.read_text(encoding="utf-8")
+            .replace("__APK64__", apk64)
+            .replace("__APK32__", apk32)
+            .replace("__APK__", apk64)
+        )
     else:
         html = (
             "<!DOCTYPE html><html><body><h1>Wamu</h1>"
-            f'<p><a href="{apk}">Download Wamu</a></p></body></html>'
+            f'<p><a href="{apk64}">Download Wamu</a></p>'
+            f'<p><a href="{apk32}">Older phones</a></p></body></html>'
         )
     return HTMLResponse(html)
 

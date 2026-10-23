@@ -33,6 +33,12 @@
     font-size: 1.05rem;
   }
   a.btn:active { transform: scale(0.99); }
+  a.btn.alt {
+    background: transparent;
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    margin-top: 12px;
+  }
   .file {
     display: block;
     word-break: break-all;
@@ -51,12 +57,13 @@
 <div class="card">
   <p class="brand">Wamu</p>
   <p class="tag">Install the Android app. One tap downloads it to this phone.</p>
-  <a class="btn" id="download" href="__APK__">Download Wamu</a>
-  <span class="file">wamu-phone.apk · works on 32-bit and 64-bit Android phones</span>
+  <a class="btn" id="download" href="__APK64__">Download Wamu</a>
+  <a class="btn alt" href="__APK32__">Phone said it isn’t compatible? Tap here</a>
+  <span class="file">Use the second button when the first file will not install.</span>
   <ol>
     <li>Tap <b>Download Wamu</b>. If this page opened inside WhatsApp, use the menu and choose <b>Open in Chrome</b> first.</li>
-    <li>When the file finishes, open it.</li>
-    <li>If the phone asks, allow install from this source, then tap <b>Install</b>.</li>
+    <li>If the phone says the app isn’t compatible, come back and tap the second button.</li>
+    <li>When the file finishes, open it and allow install from this source.</li>
     <li>Open <b>Wamu</b> and sign in. A newer link installs over the app you already have.</li>
   </ol>
 </div>
