@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,21 @@ class WelcomeTutorialScreen extends ConsumerStatefulWidget {
 class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
   final _page = PageController();
   int _index = 0;
+  Timer? _auto;
+
+  @override
+  void initState() {
+    super.initState();
+    _armAuto();
+  }
+
+  void _armAuto() {
+    _auto?.cancel();
+    _auto = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      _next();
+    });
+  }
 
   static const _steps = <_TutorialStep>[
     _TutorialStep(
@@ -73,6 +90,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
   ];
 
   Future<void> _finish() async {
+    _auto?.cancel();
     if (!widget.replay) {
       await ref.read(tutorialControllerProvider).markCompleted();
     }
@@ -101,6 +119,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
 
   @override
   void dispose() {
+    _auto?.cancel();
     _page.dispose();
     super.dispose();
   }
@@ -158,13 +177,16 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                 child: PageView.builder(
                   controller: _page,
                   itemCount: _steps.length,
-                  onPageChanged: (i) => setState(() => _index = i),
+                  onPageChanged: (i) {
+                    setState(() => _index = i);
+                    _armAuto();
+                  },
                   itemBuilder: (context, i) {
                     final s = _steps[i];
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Spacer(flex: 1),
                           if (s.isWelcome) ...[
@@ -172,26 +194,24 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                             const SizedBox(height: 20),
                             Text(
                               'Wamu',
-                              textAlign: TextAlign.center,
+                              textAlign: TextAlign.start,
                               style: AppTheme.brandHero.copyWith(fontSize: 40),
                             ),
                           ] else
-                            Center(
-                              child: CircleAvatar(
-                                radius: 44,
-                                backgroundColor:
-                                    AppTheme.accentGreen.withValues(alpha: 0.18),
-                                child: Icon(
-                                  s.icon,
-                                  size: 40,
-                                  color: AppTheme.accentGreen,
-                                ),
+                            CircleAvatar(
+                              radius: 44,
+                              backgroundColor:
+                                  AppTheme.accentGreen.withValues(alpha: 0.18),
+                              child: Icon(
+                                s.icon,
+                                size: 40,
+                                color: AppTheme.accentGreen,
                               ),
                             ),
                           const SizedBox(height: 24),
                           Text(
                             s.title,
-                            textAlign: TextAlign.center,
+                            textAlign: TextAlign.start,
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
@@ -199,7 +219,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                           const SizedBox(height: 12),
                           Text(
                             s.body,
-                            textAlign: TextAlign.center,
+                            textAlign: TextAlign.start,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               height: 1.45,
                             ),
@@ -216,7 +236,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                               ),
                               child: Text(
                                 s.tip!,
-                                textAlign: TextAlign.center,
+                                textAlign: TextAlign.start,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: AppTheme.messengerMuted,
                                 ),
