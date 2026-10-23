@@ -36,6 +36,13 @@ python -m alembic upgrade head
 echo "[wamu] bootstrap seed…"
 python -m scripts.bootstrap
 
+# Shop photos and clips live here. On Railway this is a mounted volume.
+MEDIA_DIR="${MEDIA_ROOT:-/app/media_uploads}"
+mkdir -p "$MEDIA_DIR"
+if [ -d /app/seed_media ]; then
+  cp -an /app/seed_media/. "$MEDIA_DIR/" || true
+fi
+
 # Cloud Run sets PORT (often 8080); local/Docker default 8000
 PORT="${PORT:-8000}"
 echo "[wamu] starting uvicorn on 0.0.0.0:${PORT}…"

@@ -14,7 +14,6 @@ import '../../shared/utils/order_tracking.dart';
 import '../../shared/utils/ugx_formatter.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
-import '../../shared/widgets/momo_otp_dialog.dart';
 import '../../shared/widgets/momo_provider_picker.dart';
 import '../../shared/widgets/wamu_network_image.dart';
 import '../businesses/favorites_repository.dart';
@@ -438,7 +437,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
             orderId: order.id,
             idempotencyKey: const Uuid().v4(),
             provider: _retryProvider,
-            onOtpRequired: momoOtpPrompt(context),
           );
       if (!mounted) return;
       final status = payment['status']?.toString() ?? 'UNKNOWN';

@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -30,16 +29,15 @@ from app.services.video_processing import media_path_from_url
 
 
 def _disk_size(video_url: str | None) -> int:
+    from app.core.media_root import media_file_from_url
+
     if not video_url:
         return 10**12
-    path = urlsplit(video_url).path
-    if "/media-files/" not in path:
+    f = media_file_from_url(video_url)
+    if f is None:
         return 10**12
-    rel = path.split("/media-files/", 1)[1]
-    root = Path(__file__).resolve().parents[2] / "media_uploads"
-    f = root / rel
     try:
-        return f.stat().st_size if f.is_file() else 10**12
+        return f.stat().st_size
     except OSError:
         return 10**12
 
@@ -215,6 +213,13 @@ async def list_videos(
         .limit(fetch_n)
     )
     videos = list(result.scalars().all())
+    from app.core.media_root import local_media_missing
+    from app.services.business import _repair_shop_logos
+
+    await _repair_shop_logos(db, [v.business for v in videos if v.business is not None])
+    # A redeploy used to delete the file while the row stayed. Skip those clips
+    # so the phone does not sit on "tap to retry" for a video that is gone.
+    videos = [v for v in videos if not local_media_missing(v.video_url)]
     # Drop duplicate encodings of the same clip (seed/manifest duplicates).
     seen_urls: set[str] = set()
     unique: list[BusinessVideo] = []

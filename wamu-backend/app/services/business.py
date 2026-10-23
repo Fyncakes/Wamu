@@ -10,6 +10,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.media_root import live_shop_image
 from app.models.audit import AuditLog
 from app.models.business import (
     Business,
@@ -115,6 +116,27 @@ async def create_business(db: AsyncSession, user: User, data: BusinessCreate) ->
     return result.scalar_one()
 
 
+async def _repair_shop_logos(db: AsyncSession, businesses: list[Business]) -> None:
+    """Point a missing seed logo at a photo the owner already uploaded."""
+    pending = [b for b in businesses if not live_shop_image(b.logo_url)]
+    if not pending:
+        return
+    owner_ids = {b.owner_id for b in pending}
+    rows = await db.execute(select(UserProfile).where(UserProfile.user_id.in_(owner_ids)))
+    avatars = {profile.user_id: profile.avatar_url for profile in rows.scalars()}
+    changed = False
+    for business in pending:
+        cover = business.cover_url if live_shop_image(business.cover_url) else None
+        avatar = avatars.get(business.owner_id)
+        avatar = avatar if live_shop_image(avatar) else None
+        chosen = cover or avatar
+        if chosen and chosen != business.logo_url:
+            business.logo_url = chosen
+            changed = True
+    if changed:
+        await db.flush()
+
+
 async def list_owned_businesses(db: AsyncSession, user: User) -> list[Business]:
     result = await db.execute(
         select(Business)
@@ -122,7 +144,9 @@ async def list_owned_businesses(db: AsyncSession, user: User) -> list[Business]:
         .where(Business.owner_id == user.id, Business.deleted_at.is_(None))
         .order_by(Business.created_at.desc())
     )
-    return list(result.scalars().all())
+    rows = list(result.scalars().all())
+    await _repair_shop_logos(db, rows)
+    return rows
 
 
 async def get_business(db: AsyncSession, business_id: uuid.UUID) -> Business:
@@ -134,6 +158,7 @@ async def get_business(db: AsyncSession, business_id: uuid.UUID) -> Business:
     business = result.scalar_one_or_none()
     if not business:
         raise HTTPException(status_code=404, detail="Business not found")
+    await _repair_shop_logos(db, [business])
     return business
 
 
@@ -202,6 +227,7 @@ async def list_businesses(
         total = await db.scalar(count_stmt) or 0
         stmt = stmt.offset(fetch_offset).limit(fetch_limit)
         rows = list((await db.execute(stmt)).scalars().all())
+        await _repair_shop_logos(db, rows)
         return rows, int(total)
 
     rows = list((await db.execute(stmt.limit(fetch_limit))).scalars().all())
@@ -218,6 +244,7 @@ async def list_businesses(
     total = len(scored)
     start = (page - 1) * page_size
     page_rows = [b for _, b in scored[start : start + page_size]]
+    await _repair_shop_logos(db, page_rows)
     return page_rows, total
 
 

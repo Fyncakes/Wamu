@@ -232,12 +232,6 @@ def process_uploaded_video_bytes(
 
 
 def media_path_from_url(video_url: str) -> Path | None:
-    from urllib.parse import urlsplit
+    from app.core.media_root import media_file_from_url
 
-    path = urlsplit(video_url or "").path
-    if "/media-files/" not in path:
-        return None
-    rel = path.split("/media-files/", 1)[1]
-    root = Path(__file__).resolve().parents[2] / "media_uploads"
-    f = root / rel
-    return f if f.is_file() else None
+    return media_file_from_url(video_url)

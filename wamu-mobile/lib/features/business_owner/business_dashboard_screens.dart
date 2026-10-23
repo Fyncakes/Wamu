@@ -329,9 +329,11 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
   final _promo = TextEditingController();
   String? _businessId;
   String? _coverUrl;
+  String? _logoUrl;
   bool _loading = true;
   bool _saving = false;
   bool _uploadingCover = false;
+  bool _uploadingLogo = false;
 
   @override
   void initState() {
@@ -360,6 +362,7 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
         final shop = Map<String, dynamic>.from(list.first);
         _businessId = shop['id']?.toString();
         _coverUrl = shop['cover_url']?.toString();
+        _logoUrl = shop['logo_url']?.toString();
         _phone.text = shop['phone']?.toString() ?? '';
         final desc = shop['description']?.toString() ?? '';
         _desc.text = desc.contains('\nPROMO:') ? desc.split('\nPROMO:').first : desc;
@@ -371,19 +374,38 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _pickCover() async {
+  Future<void> _pickCover() => _pickShopPhoto(logo: false);
+
+  Future<void> _pickLogo() => _pickShopPhoto(logo: true);
+
+  String? get _shopPhotoUrl {
+    final logo = (_logoUrl ?? '').trim();
+    final cover = (_coverUrl ?? '').trim();
+    if (logo.isEmpty || logo.contains('/seed/')) {
+      if (cover.isNotEmpty && !cover.contains('/seed/')) return cover;
+    }
+    return logo.isEmpty ? null : logo;
+  }
+
+  Future<void> _pickShopPhoto({required bool logo}) async {
     final businessId = _businessId;
     if (businessId == null || businessId.isEmpty) return;
     final file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1600,
+      maxWidth: logo ? 1024 : 1600,
       imageQuality: 85,
     );
     if (file == null) return;
-    setState(() => _uploadingCover = true);
+    setState(() {
+      if (logo) {
+        _uploadingLogo = true;
+      } else {
+        _uploadingCover = true;
+      }
+    });
     try {
       final bytes = await file.readAsBytes();
-      var filename = file.name.isNotEmpty ? file.name : 'cover.jpg';
+      var filename = file.name.isNotEmpty ? file.name : (logo ? 'logo.jpg' : 'cover.jpg');
       final lower = filename.toLowerCase();
       var contentType = 'image/jpeg';
       if (lower.endsWith('.png') || (file.mimeType ?? '').contains('png')) {
@@ -410,20 +432,41 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
       }
       await ref.read(apiClientProvider).patch(
         '/businesses/$businessId',
-        data: {'cover_url': url},
+        data: {logo ? 'logo_url' : 'cover_url': url},
       );
       if (!mounted) return;
-      setState(() => _coverUrl = url);
+      setState(() {
+        if (logo) {
+          _logoUrl = url;
+        } else {
+          _coverUrl = url;
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shop cover updated')),
+        SnackBar(content: Text(logo ? 'Shop photo updated' : 'Shop cover updated')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(apiErrorMessage(e, fallback: 'Could not update the shop cover'))),
+        SnackBar(
+          content: Text(
+            apiErrorMessage(
+              e,
+              fallback: logo ? 'Could not update the shop photo' : 'Could not update the shop cover',
+            ),
+          ),
+        ),
       );
     } finally {
-      if (mounted) setState(() => _uploadingCover = false);
+      if (mounted) {
+        setState(() {
+          if (logo) {
+            _uploadingLogo = false;
+          } else {
+            _uploadingCover = false;
+          }
+        });
+      }
     }
   }
 
@@ -493,11 +536,52 @@ class _BusinessSettingsScreenState extends ConsumerState<BusinessSettingsScreen>
                 TextField(controller: _name, decoration: const InputDecoration(labelText: 'Shop name')),
                 const SizedBox(height: 12),
                 TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Business phone')),
+                const SizedBox(height: 20),
+                const Text(
+                  'Shop photo',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'This is the round photo next to your shop name. A cover or profile photo you already uploaded is used until you pick a different one.',
+                ),
                 const SizedBox(height: 12),
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(48),
+                    child: SizedBox(
+                      width: 96,
+                      height: 96,
+                      child: (_shopPhotoUrl ?? '').isEmpty
+                          ? const ColoredBox(
+                              color: Color(0x1F6B4F3A),
+                              child: Icon(Icons.storefront_outlined, size: 36),
+                            )
+                          : WamuNetworkImage(
+                              imageUrl: _shopPhotoUrl,
+                              width: 96,
+                              height: 96,
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _uploadingLogo ? null : _pickLogo,
+                  icon: _uploadingLogo
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.account_circle_outlined),
+                  label: Text(_uploadingLogo ? 'Uploading…' : 'Upload shop photo'),
+                ),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _desc,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Description'),
+                  decoration: const InputDecoration(labelText: 'About'),
                 ),
                 const SizedBox(height: 12),
                 TextField(

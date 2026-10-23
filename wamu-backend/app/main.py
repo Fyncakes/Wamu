@@ -16,11 +16,12 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1 import api_router
 from app.core.config import get_settings
 from app.core.logging import new_request_id, request_id_ctx, setup_logging
+from app.core.media_root import media_root
 from app.core.media_urls import public_origin, rewrite_media_tree
 from app.core.rate_limit import is_rate_limited
 
 settings = get_settings()
-_MEDIA_ROOT = Path(__file__).resolve().parents[1] / "media_uploads"
+_MEDIA_ROOT = media_root()
 # Flutter web build (phone demo): repo dist/web → served at /
 _WEB_ROOT = Path(__file__).resolve().parents[2] / "dist" / "web"
 
@@ -80,6 +81,14 @@ async def static_cache_middleware(request: Request, call_next):
     """Long-cache hashed Flutter assets + media; never cache index.html (demo refresh)."""
     response = await call_next(request)
     path = request.url.path
+    if path.startswith("/media-files/"):
+        # ExoPlayer does not decompress a gzip video body, so a ranged MP4
+        # must stay raw bytes. Images still load because Flutter decodes gzip.
+        request.scope["headers"] = [
+            (key, value)
+            for key, value in request.scope["headers"]
+            if key.lower() != b"accept-encoding"
+        ]
     if path in ("/", "/index.html") or path.endswith("/index.html"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     elif path.startswith("/media-files/"):

@@ -31,7 +31,6 @@ import '../../shared/utils/phone_normalize.dart';
 import '../../shared/utils/ugx_formatter.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
-import '../../shared/widgets/momo_otp_dialog.dart';
 import '../../shared/widgets/momo_provider_picker.dart';
 import '../auth/auth_provider.dart';
 import '../business_owner/owner_products_repository.dart';
@@ -3023,7 +3022,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             orderId: orderId,
             idempotencyKey: const Uuid().v4(),
             provider: _payProvider,
-            onOtpRequired: momoOtpPrompt(context),
           );
       if (!mounted) return;
       final status = payment['status']?.toString() ?? 'UNKNOWN';

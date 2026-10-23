@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -567,6 +568,7 @@ class _VideoPageState extends State<_VideoPage>
   bool _muted = false;
   bool _loadFailed = false;
   String? _loadError;
+  bool _opening = false;
   /// User tapped to pause while this page is active.
   bool _userPaused = false;
   /// Last known position — used so resume never jumps to 0.
@@ -707,20 +709,23 @@ class _VideoPageState extends State<_VideoPage>
   }
 
   Future<void> _initPlayer() async {
-    if (!_isMp4) return;
+    if (!_isMp4) {
+      if (mounted && _opening) setState(() => _opening = false);
+      return;
+    }
     // Re-pin API origin on each play (tunnel hostname rotates often).
     ServerConfig.correctWebDevServerUrl();
     var url = resolveMediaUrl(widget.video.videoUrl);
     // Same-origin absolute path when the API still returns /media-files/...
     if (url != null && url.startsWith('/')) {
-      final origin = Uri.base.origin;
-      url = '$origin$url';
+      url = '${ServerConfig.mediaOrigin}$url';
     }
     if (url == null || url.isEmpty) {
       if (mounted) {
         setState(() {
           _loadFailed = true;
           _loadError = 'Missing video URL';
+          _opening = false;
         });
       }
       return;
@@ -729,6 +734,7 @@ class _VideoPageState extends State<_VideoPage>
       setState(() {
         _loadFailed = false;
         _loadError = null;
+        _opening = true;
       });
     }
     final uri = Uri.tryParse(url);
@@ -737,6 +743,7 @@ class _VideoPageState extends State<_VideoPage>
         setState(() {
           _loadFailed = true;
           _loadError = 'Bad video URL — tap to retry';
+          _opening = false;
         });
       }
       return;
@@ -760,6 +767,7 @@ class _VideoPageState extends State<_VideoPage>
         _ready = true;
         _loadFailed = false;
         _loadError = null;
+        _opening = false;
       });
       // Mobile Chrome paints <video> above Flutter; disable its pointer events.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -769,11 +777,29 @@ class _VideoPageState extends State<_VideoPage>
     } catch (e) {
       await c.dispose();
       if (_controller == c) _controller = null;
+      var message = 'Video failed to load — tap to retry';
+      try {
+        final probe = await Dio().head<void>(
+          url,
+          options: Options(
+            followRedirects: true,
+            validateStatus: (_) => true,
+            sendTimeout: const Duration(seconds: 12),
+            receiveTimeout: const Duration(seconds: 12),
+            headers: const {'Accept-Encoding': 'identity'},
+          ),
+        );
+        final code = probe.statusCode ?? 0;
+        if (code == 404 || code == 410) {
+          message = 'This clip is no longer on the server. Upload it again from your shop.';
+        }
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _ready = false;
           _loadFailed = true;
-          _loadError = 'Video failed to load — tap to retry';
+          _opening = false;
+          _loadError = message;
         });
       }
     }
@@ -784,6 +810,7 @@ class _VideoPageState extends State<_VideoPage>
     setState(() {
       _loadFailed = false;
       _loadError = null;
+      _opening = true;
     });
     _scheduleInitPlayer();
   }
@@ -925,7 +952,11 @@ class _VideoPageState extends State<_VideoPage>
               child: ColoredBox(
                 // Slight alpha so the layer paints and participates in hit tests.
                 color: const Color(0x01000000),
-                child: _loadFailed
+                child: _opening && !_ready
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    : _loadFailed
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,

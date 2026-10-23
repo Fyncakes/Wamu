@@ -10,7 +10,6 @@ import '../../core/network/api_error.dart';
 import '../../shared/models/business_model.dart';
 import '../../shared/utils/json_numbers.dart';
 import '../../shared/utils/ugx_formatter.dart';
-import '../../shared/widgets/momo_otp_dialog.dart';
 import '../../shared/widgets/wamu_network_image.dart';
 import '../auth/auth_provider.dart';
 import '../cart/cart_provider.dart';
@@ -217,7 +216,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           idempotencyKey: cart.newIdempotencyKey(),
           provider: _provider,
           phone: phone,
-          onOtpRequired: momoOtpPrompt(context),
           onStatus: (s) {
             if (!mounted) return;
             setState(() {

@@ -7,19 +7,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-from pathlib import Path
 
 import boto3
 from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import get_settings
+from app.core.media_root import media_root
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
-
-# Local fallback directory (used when MinIO is unreachable)
-_LOCAL_MEDIA_ROOT = Path(__file__).resolve().parents[3] / "media_uploads"
 
 # After the first failed S3 attempt in a process, skip further remote tries
 # so demo uploads don't spam botocore connection-refused tracebacks.
@@ -61,7 +58,7 @@ def _local_upload(data: bytes, *, content_type: str, folder: str) -> tuple[str, 
         "video/mp4": ".mp4",
     }.get(content_type.split(";")[0].strip().lower(), "")
     key = f"{folder}/{uuid.uuid4().hex}{ext}"
-    dest = _LOCAL_MEDIA_ROOT / key
+    dest = media_root() / key
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
     # Relative path — API middleware / clients pin to the live tunnel or LAN origin.
