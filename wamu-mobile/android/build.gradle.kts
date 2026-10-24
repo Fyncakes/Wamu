@@ -28,7 +28,20 @@ subprojects {
         (extensions.findByName("android") as? com.android.build.gradle.BaseExtension)
             ?.compileSdkVersion(36)
     }
-    // file_picker:checkReleaseAarMetadata fails while the plugin is still SDK 34
+    // file_picker:checkReleaseAarMetadata fails while the plugin is still SDK 34.
+    // Those checks are skipped, so create the folder the contacts plugin still expects.
+    afterEvaluate {
+        for ((variant, check) in listOf(
+            "release" to "checkReleaseAarMetadata",
+            "debug" to "checkDebugAarMetadata",
+        )) {
+            layout.buildDirectory
+                .dir("intermediates/aar_metadata_check/$variant/$check")
+                .get()
+                .asFile
+                .mkdirs()
+        }
+    }
     tasks.configureEach {
         if (name.contains("AarMetadata", ignoreCase = true)) {
             enabled = false
