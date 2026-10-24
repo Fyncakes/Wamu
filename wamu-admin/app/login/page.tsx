@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BrandMark } from "@/components/brand-mark";
 import { api, ApiError } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/auth";
 
@@ -76,9 +77,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen">
       <div className="hidden w-1/2 bg-wamu-700 lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 font-display text-2xl font-bold text-white">
-            W
-          </div>
+          <BrandMark className="h-14 w-14 rounded-2xl" />
           <h1 className="mt-8 font-display text-4xl font-semibold leading-tight text-white">
             WAMU Admin
           </h1>
@@ -95,9 +94,7 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-wamu-600 font-display text-lg font-bold text-white">
-              W
-            </div>
+            <BrandMark />
             <h1 className="mt-4 font-display text-2xl font-semibold text-slate-900">
               WAMU Admin
             </h1>

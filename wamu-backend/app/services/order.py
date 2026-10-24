@@ -801,7 +801,11 @@ async def enrich_order_responses(db: AsyncSession, orders: list[Order]) -> list:
         ).scalars().all()
         for img in rows:
             if img.product_id not in image_by_product and img.url:
-                image_by_product[img.product_id] = img.url
+                from app.core.media_root import servable_media_url
+
+                live = servable_media_url(img.url)
+                if live:
+                    image_by_product[img.product_id] = live
 
     biz_by_id: dict[uuid.UUID, Business] = {}
     if business_ids:

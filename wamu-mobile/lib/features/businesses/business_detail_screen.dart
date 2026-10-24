@@ -390,7 +390,7 @@ class _BusinessDetailScreenState extends ConsumerState<BusinessDetailScreen> {
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.all(16),
-                  child: Text('No products listed yet.'),
+                  child: Text('No products available yet.'),
                 ),
               )
             else

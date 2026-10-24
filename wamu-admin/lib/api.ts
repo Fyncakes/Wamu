@@ -104,9 +104,14 @@ async function request<T>(
   return data as T;
 }
 
-async function fetchHealthEndpoint(
-  path: string,
-): Promise<{ status: string; latency_ms?: number; detail?: string }> {
+async function fetchHealthEndpoint(path: string): Promise<{
+  status: string;
+  latency_ms?: number;
+  detail?: string;
+  otp_mock?: boolean;
+  payment_mock?: boolean;
+  payment_momo_otp?: boolean;
+}> {
   const start = performance.now();
   const response = await fetch(`${API_URL}${path}`);
   const latency_ms = Math.round(performance.now() - start);
@@ -125,7 +130,16 @@ async function fetchHealthEndpoint(
       : response.ok
         ? "ok"
         : "error";
-  return { status, latency_ms, detail: typeof data.detail === "string" ? data.detail : undefined };
+  const flag = (key: string) =>
+    typeof data[key] === "boolean" ? (data[key] as boolean) : undefined;
+  return {
+    status,
+    latency_ms,
+    detail: typeof data.detail === "string" ? data.detail : undefined,
+    otp_mock: flag("otp_mock"),
+    payment_mock: flag("payment_mock"),
+    payment_momo_otp: flag("payment_momo_otp"),
+  };
 }
 
 export const api = {
@@ -519,6 +533,9 @@ export const api = {
 
       return {
         status: apiHealth.status,
+        otp_mock: apiHealth.otp_mock,
+        payment_mock: apiHealth.payment_mock,
+        payment_momo_otp: apiHealth.payment_momo_otp,
         database: {
           status: dbHealth.status,
           latency_ms: dbHealth.latency_ms,

@@ -99,6 +99,7 @@ def rails_readiness(settings: Settings | None = None) -> dict[str, Any]:
         "payment_webhook_secret_set": webhook_ok,
         "fcm_server_key_set": _set(s.fcm_server_key),
         "otp_mock_mode": s.otp_mock_mode,
+        "payment_momo_otp": bool(getattr(s, "payment_momo_otp_enabled", True)),
         "sms_provider_configured": sms,
         "ready_for_live_otp": (not s.otp_mock_mode) and sms,
         "turn_configured": turn,

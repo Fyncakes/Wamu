@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/network/api_error.dart';
 import '../../shared/models/business_model.dart';
 import '../../shared/models/product_model.dart';
 import '../../shared/utils/ugx_formatter.dart';
+import '../../shared/widgets/error_view.dart';
 import '../home/catalog_repository.dart';
 
 /// Search tab — businesses + products from GET /search.
@@ -37,7 +39,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _products = result.products;
       });
     } catch (e) {
-      setState(() => _error = '$e');
+      setState(() => _error = apiErrorMessage(e));
     } finally {
       setState(() => _loading = false);
     }
@@ -72,11 +74,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorView(message: _error!, onRetry: () => _search(_controller.text))
               : !_searched
                   ? const Center(child: Text('Try “cake”, “phones”, or “Ntinda”'))
                   : _businesses.isEmpty && _products.isEmpty
-                      ? const Center(child: Text('No results in WAMU catalog'))
+                      ? const Center(
+                          child: Text('No results found. Try another search.'),
+                        )
                       : ListView(
                           padding: const EdgeInsets.all(16),
                           children: [

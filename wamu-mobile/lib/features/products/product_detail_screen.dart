@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/network/api_error.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/product_model.dart';
 import '../../shared/utils/ugx_formatter.dart';
@@ -73,7 +74,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       if (mounted) context.push('/chat/${convo.id}');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(apiErrorMessage(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _sharing = false);
@@ -95,7 +98,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
+        SnackBar(content: Text(apiErrorMessage(e))),
       );
     }
   }

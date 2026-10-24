@@ -7,10 +7,20 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.integrations.storage import s3
 from app.models.user import User
+from app.core.media_root import servable_media_url
 from app.schemas.marketplace import ProductCreate, ProductResponse, ProductUpdate
 from app.services import product as product_service
 
 router = APIRouter()
+
+
+def _public_product(product) -> ProductResponse:
+    """Hide image rows whose file is gone so the app shows a placeholder."""
+    body = ProductResponse.model_validate(product)
+    body.images = [
+        img for img in body.images if servable_media_url(img.url) is not None
+    ]
+    return body
 
 
 @router.get("", response_model=list[ProductResponse])
@@ -23,7 +33,7 @@ async def list_products(
     rows, _ = await product_service.list_products(
         db, business_id=business_id, page=page, page_size=page_size
     )
-    return rows
+    return [_public_product(row) for row in rows]
 
 
 @router.post("/business/{business_id}", response_model=ProductResponse, status_code=201)
@@ -33,7 +43,7 @@ async def create_product(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await product_service.create_product(db, user, business_id, body)
+    return _public_product(await product_service.create_product(db, user, business_id, body))
 
 
 @router.get("/business/{business_id}/manage", response_model=list[ProductResponse])
@@ -43,12 +53,13 @@ async def list_owner_products(
     db: AsyncSession = Depends(get_db),
 ):
     """Merchant product list — includes items still waiting for a photo."""
-    return await product_service.list_owner_products(db, user, business_id)
+    rows = await product_service.list_owner_products(db, user, business_id)
+    return [_public_product(row) for row in rows]
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: UUID, db: AsyncSession = Depends(get_db)):
-    return await product_service.get_product(db, product_id)
+    return _public_product(await product_service.get_product(db, product_id))
 
 
 @router.get("/{product_id}/related")
@@ -61,7 +72,7 @@ async def related_products(
     buckets = await product_service.related_products(db, product_id, limit=limit)
 
     def _ser(rows):
-        return [ProductResponse.model_validate(p) for p in rows]
+        return [_public_product(p) for p in rows]
 
     return {
         "same_shop": _ser(buckets["same_shop"]),
@@ -78,7 +89,7 @@ async def update_product(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await product_service.update_product(db, user, product_id, body)
+    return _public_product(await product_service.update_product(db, user, product_id, body))
 
 
 @router.post("/{product_id}/images", response_model=ProductResponse)
@@ -112,4 +123,6 @@ async def upload_product_image(
 
             raise HTTPException(status_code=400, detail="Only images allowed")
     url, key = s3.upload_bytes(data, content_type=content_type, folder="products")
-    return await product_service.add_product_image(db, user, product_id, url, key)
+    return _public_product(
+        await product_service.add_product_image(db, user, product_id, url, key)
+    )

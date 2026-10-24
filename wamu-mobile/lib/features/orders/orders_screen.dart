@@ -180,7 +180,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       body: _loading && _orders == null
           ? const LoadingView(message: 'Loading orders…')
           : _error != null && _orders == null
-              ? ErrorView(message: '$_error', onRetry: () => _refresh(showSpinner: true))
+              ? ErrorView(
+                  message: apiErrorMessage(_error!),
+                  onRetry: () => _refresh(showSpinner: true),
+                )
               : (_orders == null || _orders!.isEmpty)
                   ? Center(
                       child: Column(
@@ -188,7 +191,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
                         children: [
                           Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 12),
-                          const Text('No orders yet'),
+                          const Text('You have no orders yet.'),
                           TextButton(
                             onPressed: () => context.go('/home'),
                             child: const Text('Browse shops'),
@@ -800,7 +803,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
       body: _loading && _order == null
           ? const LoadingView()
           : _error != null && _order == null
-              ? ErrorView(message: '$_error', onRetry: () => _refresh(showSpinner: true))
+              ? ErrorView(
+                  message: apiErrorMessage(_error!),
+                  onRetry: () => _refresh(showSpinner: true),
+                )
               : Builder(
                   builder: (context) {
                     final order = _order!;

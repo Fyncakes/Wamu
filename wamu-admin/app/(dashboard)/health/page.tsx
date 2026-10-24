@@ -12,16 +12,20 @@ function StatusCard({
   label,
   status,
   detail,
+  tone,
 }: {
   label: string;
   status: string;
   detail?: string;
+  tone?: "success" | "warning" | "danger";
 }) {
   const healthy =
     status.toLowerCase() === "ok" ||
     status.toLowerCase() === "healthy" ||
     status.toLowerCase() === "ready" ||
-    status.toLowerCase() === "set";
+    status.toLowerCase() === "set" ||
+    status.toLowerCase() === "off";
+  const variant = tone ?? (healthy ? "success" : "danger");
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -29,7 +33,7 @@ function StatusCard({
         <h3 className="font-display text-lg font-semibold text-slate-900">
           {label}
         </h3>
-        <Badge variant={healthy ? "success" : "danger"}>{status}</Badge>
+        <Badge variant={variant}>{status}</Badge>
       </div>
       {detail && <p className="mt-2 text-sm text-slate-500">{detail}</p>}
     </div>
@@ -56,6 +60,7 @@ export default function HealthPage() {
   const { data, error, loading } = useAsyncData(fetchHealth, [refreshKey]);
   const health = data?.health;
   const rails = data?.rails;
+  const momoOtp = health?.payment_momo_otp ?? rails?.payment_momo_otp;
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1);
@@ -136,8 +141,24 @@ export default function HealthPage() {
                 {String(rails.environment ?? "—")}
                 {rails.otp_mock_mode ? " · OTP mock on" : ""}
                 {rails.payment_mock_auto_success ? " · MoMo mock auto-success" : ""}
+                {momoOtp === false ? " · MTN payment code off" : ""}
+                {momoOtp === true ? " · MTN payment code on" : ""}
               </p>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <StatusCard
+                  label="MTN payment code"
+                  status={momoOtp == null ? "unknown" : momoOtp ? "on" : "off"}
+                  tone={momoOtp == null ? "warning" : momoOtp ? "warning" : "success"}
+                  detail={
+                    momoOtp
+                      ? "Checkout asks for a Wamu SMS code before the MTN payment finishes."
+                      : momoOtp === false
+                        ? rails?.mtn_collections_configured
+                          ? "Checkout sends the payment to MTN. The extra Wamu SMS code stays off, and the MTN collection keys are set."
+                          : "The extra Wamu SMS code stays off. Add the MTN collection keys before a live debit."
+                        : "The server did not report this flag."
+                  }
+                />
                 <StatusCard
                   label="Live SMS OTP"
                   status={railFlag(!!rails.ready_for_live_otp)}
@@ -151,9 +172,11 @@ export default function HealthPage() {
                   label="MoMo sandbox"
                   status={railFlag(!!rails.ready_for_momo_sandbox)}
                   detail={
-                    rails.mtn_collections_configured
-                      ? "MTN collections configured"
-                      : "Fill MTN_* and turn off PAYMENT_MOCK_AUTO_SUCCESS"
+                    rails.ready_for_momo_sandbox
+                      ? "MTN sandbox can take a payment."
+                      : rails.mtn_collections_configured
+                        ? "MTN collection keys are set. Sandbox ready stays off while payment mock auto-success is on."
+                        : "Add the MTN collection keys and turn off payment mock auto-success."
                   }
                 />
                 <StatusCard

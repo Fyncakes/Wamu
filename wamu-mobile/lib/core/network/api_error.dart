@@ -7,16 +7,22 @@ String apiErrorMessage(Object error, {String fallback = 'Something went wrong'})
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return 'Connection timed out — check your link and try again';
+        return 'Unable to load content. Check your internet connection and try again.';
       case DioExceptionType.connectionError:
-        return 'Cannot reach Wamu server — check the demo URL';
+        return 'Unable to load content. Check your internet connection and try again.';
       default:
         break;
+    }
+    final status = error.response?.statusCode ?? 0;
+    if (status >= 500) {
+      return 'Unable to load content. Please try again.';
     }
     final data = error.response?.data;
     if (data is Map) {
       final detail = data['detail'];
-      if (detail is String && detail.trim().isNotEmpty) return detail.trim();
+      if (detail is String && detail.trim().isNotEmpty && !_internal(detail)) {
+        return detail.trim();
+      }
       if (detail is List && detail.isNotEmpty) {
         final first = detail.first;
         if (first is Map && first['msg'] != null) {
@@ -29,15 +35,29 @@ String apiErrorMessage(Object error, {String fallback = 'Something went wrong'})
       // Hide raw DioException jargon from the UI.
       final msg = error.message!;
       if (msg.contains('receive timeout') || msg.contains('took longer than')) {
-        return 'Connection timed out — check your link and try again';
+        return 'Unable to load content. Check your internet connection and try again.';
       }
       return msg;
     }
   }
   final s = error.toString();
-  if (s.contains('receive timeout') || s.contains('DioException')) {
-    return 'Connection timed out — check your link and try again';
+  if (s.contains('SocketException') || s.contains('Failed host lookup') || s.contains('Network')) {
+    return 'Unable to load content. Check your internet connection and try again.';
   }
+  if (s.contains('receive timeout') || s.contains('DioException')) {
+    return 'Unable to load content. Check your internet connection and try again.';
+  }
+  if (_internal(s)) return fallback;
   if (s.startsWith('Exception: ')) return s.substring(11);
   return s.isEmpty ? fallback : s;
+}
+
+bool _internal(String value) {
+  final lower = value.toLowerCase();
+  return lower.contains('traceback') ||
+      lower.contains('sqlalchemy') ||
+      lower.contains('asyncpg') ||
+      lower.contains('stack') ||
+      lower.contains('/app/') ||
+      lower.contains('password');
 }

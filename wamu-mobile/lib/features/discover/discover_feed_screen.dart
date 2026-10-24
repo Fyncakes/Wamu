@@ -412,7 +412,7 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'No videos yet',
+                    'No videos available yet.',
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
@@ -430,7 +430,7 @@ class _DiscoverFeedScreenState extends ConsumerState<DiscoverFeedScreen>
               if (feed.isEmpty)
                 const Center(
                   child: Text(
-                    'No videos in this category',
+                    'No videos available yet.',
                     style: TextStyle(color: Colors.white70, fontSize: 15),
                   ),
                 )

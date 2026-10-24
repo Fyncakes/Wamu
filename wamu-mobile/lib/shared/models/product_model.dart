@@ -19,8 +19,18 @@ class ProductModel {
     String? image;
     final images = json['images'];
     if (images is List && images.isNotEmpty) {
-      final first = images.first;
-      if (first is Map) image = first['url']?.toString();
+      Map? primary;
+      Map? firstMap;
+      for (final item in images) {
+        if (item is! Map) continue;
+        firstMap ??= item;
+        if (item['is_primary'] == true) {
+          primary = item;
+          break;
+        }
+      }
+      final chosen = primary ?? firstMap;
+      image = chosen?['url']?.toString();
     }
     image ??= json['image_url']?.toString();
 

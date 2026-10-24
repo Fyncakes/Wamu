@@ -168,6 +168,9 @@ export interface HealthStatus {
   status: string;
   version?: string;
   uptime_seconds?: number;
+  otp_mock?: boolean;
+  payment_mock?: boolean;
+  payment_momo_otp?: boolean;
   database?: { status: string; latency_ms?: number };
   redis?: { status: string; latency_ms?: number };
 }
@@ -176,6 +179,7 @@ export interface RailsReadiness {
   environment?: string;
   payment_mock_auto_success?: boolean;
   otp_mock_mode?: boolean;
+  payment_momo_otp?: boolean;
   payout_auto_execute?: boolean;
   ready_for_live_otp?: boolean;
   ready_for_momo_sandbox?: boolean;

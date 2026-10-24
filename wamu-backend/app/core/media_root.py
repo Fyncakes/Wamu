@@ -38,6 +38,15 @@ def local_media_missing(url: str | None) -> bool:
     return media_file_from_url(url) is None
 
 
+def servable_media_url(url: str | None) -> str | None:
+    """Return a URL the client can load. Drop links whose file was wiped."""
+    if not url or not str(url).strip():
+        return None
+    if local_media_missing(url):
+        return None
+    return url
+
+
 def live_shop_image(url: str | None) -> bool:
     """A shop photo customers can actually load (not a missing seed file)."""
     if not url or "/seed/" in url:

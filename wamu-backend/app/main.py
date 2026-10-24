@@ -79,22 +79,25 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 @app.middleware("http")
 async def static_cache_middleware(request: Request, call_next):
     """Long-cache hashed Flutter assets + media; never cache index.html (demo refresh)."""
-    response = await call_next(request)
     path = request.url.path
     if path.startswith("/media-files/"):
-        # ExoPlayer does not decompress a gzip video body, so a ranged MP4
-        # must stay raw bytes. Images still load because Flutter decodes gzip.
+        # Strip compression before GZip runs. ExoPlayer cannot play a gzip MP4,
+        # and a cached 404 must not stick after a merchant uploads the file again.
         request.scope["headers"] = [
             (key, value)
             for key, value in request.scope["headers"]
             if key.lower() != b"accept-encoding"
         ]
+    response = await call_next(request)
     if path in ("/", "/index.html") or path.endswith("/index.html"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     elif path.startswith("/media-files/"):
-        # Posters + compressed MP4s are content-addressed by UUID filename.
-        response.headers.setdefault("Cache-Control", "public, max-age=604800, immutable")
-        response.headers.setdefault("Accept-Ranges", "bytes")
+        if response.status_code == 200:
+            # Posters + compressed MP4s are content-addressed by UUID filename.
+            response.headers["Cache-Control"] = "public, max-age=604800, immutable"
+            response.headers.setdefault("Accept-Ranges", "bytes")
+        else:
+            response.headers["Cache-Control"] = "no-store"
     elif path.startswith("/canvaskit/") or path.startswith("/assets/") or path.endswith(
         (".js", ".wasm", ".woff2", ".woff", ".ttf", ".otf")
     ):

@@ -17,6 +17,7 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "WAMU Admin | Uganda Super App",
   description: "Administration dashboard for WAMU Uganda marketplace",
+  icons: { icon: "/wamu-icon.png", apple: "/wamu-icon.png" },
 };
 
 export default function RootLayout({

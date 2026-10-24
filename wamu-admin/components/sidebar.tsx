@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { BrandMark } from "@/components/brand-mark";
 import { clearToken } from "@/lib/auth";
 
 const navItems = [
@@ -78,9 +79,7 @@ export function Sidebar({
       <div className="border-b border-slate-200 px-6 py-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-wamu-600 font-display text-lg font-bold text-white">
-              W
-            </div>
+            <BrandMark />
             <div>
               <p className="font-display text-lg font-semibold text-slate-900">
                 WAMU
