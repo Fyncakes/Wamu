@@ -16,14 +16,14 @@ class PrivacyScreen extends ConsumerWidget {
     final showReceipts = user?.showReadReceipts ?? true;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Privacy')),
+      appBar: AppBar(title: Text('Privacy')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
+        padding: EdgeInsets.fromLTRB(0, 8, 0, 32),
         children: [
           SwitchListTile(
-            secondary: const Icon(Icons.visibility_outlined, color: AppTheme.accentGreen),
-            title: const Text('Last seen'),
-            subtitle: const Text(
+            secondary: Icon(Icons.visibility_outlined, color: AppTheme.accentGreen),
+            title: Text('Last seen'),
+            subtitle: Text(
               'If off, you won’t share or see last seen',
             ),
             value: showLast,
@@ -32,9 +32,9 @@ class PrivacyScreen extends ConsumerWidget {
             onChanged: (v) => ref.read(authProvider.notifier).updatePrivacy(showLastSeen: v),
           ),
           SwitchListTile(
-            secondary: const Icon(Icons.circle, color: AppTheme.accentGreen, size: 18),
-            title: const Text('Online status'),
-            subtitle: const Text(
+            secondary: Icon(Icons.circle, color: AppTheme.accentGreen, size: 18),
+            title: Text('Online status'),
+            subtitle: Text(
               'If off, you won’t share or see “online”',
             ),
             value: showOnline,
@@ -43,9 +43,9 @@ class PrivacyScreen extends ConsumerWidget {
             onChanged: (v) => ref.read(authProvider.notifier).updatePrivacy(showOnline: v),
           ),
           SwitchListTile(
-            secondary: const Icon(Icons.done_all, color: AppTheme.accentGreen),
-            title: const Text('Read receipts'),
-            subtitle: const Text(
+            secondary: Icon(Icons.done_all, color: AppTheme.accentGreen),
+            title: Text('Read receipts'),
+            subtitle: Text(
               'If off, you won’t send or see blue ✓✓ in 1:1 chats (groups unchanged)',
             ),
             value: showReceipts,
@@ -54,9 +54,9 @@ class PrivacyScreen extends ConsumerWidget {
             onChanged: (v) =>
                 ref.read(authProvider.notifier).updatePrivacy(showReadReceipts: v),
           ),
-          const Divider(),
-          const ListTile(
-            leading: Icon(Icons.lock_outline, color: AppTheme.messengerMuted),
+          Divider(),
+          ListTile(
+            leading: Icon(Icons.lock_outline, color: AppTheme.muted(context)),
             title: Text('Encryption'),
             subtitle: Text(
               'Messages travel over TLS today. Signal-protocol E2EE is planned — '

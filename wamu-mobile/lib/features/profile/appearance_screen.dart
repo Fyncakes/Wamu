@@ -15,20 +15,20 @@ class AppearanceScreen extends ConsumerWidget {
     final isDarkChrome = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Appearance')),
+      appBar: AppBar(title: Text('Appearance')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           Text('App theme', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'Pick dark or white — previews match the Chats look from modern messengers.',
             style: TextStyle(
-              color: isDarkChrome ? AppTheme.messengerMuted : const Color(0xFF667781),
+              color: isDarkChrome ? AppTheme.muted(context) : Color(0xFF667781),
               fontSize: 13,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -39,7 +39,7 @@ class AppearanceScreen extends ConsumerWidget {
                   onTap: () => notifier.setThemeMode(ThemeMode.dark),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: _ThemePreviewCard(
                   label: 'White',
@@ -50,9 +50,9 @@ class AppearanceScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Material(
-            color: isDarkChrome ? AppTheme.messengerElevated : const Color(0xFFF0F2F5),
+            color: isDarkChrome ? AppTheme.messengerElevated : Color(0xFFF0F2F5),
             borderRadius: BorderRadius.circular(14),
             child: ListTile(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -62,21 +62,21 @@ class AppearanceScreen extends ConsumerWidget {
                     ? AppTheme.accentGreen
                     : null,
               ),
-              title: const Text('System default'),
-              subtitle: const Text('Follow your phone light / dark setting'),
+              title: Text('System default'),
+              subtitle: Text('Follow your phone light / dark setting'),
               trailing: appearance.themeMode == ThemeMode.system
-                  ? const Icon(Icons.check_circle, color: AppTheme.accentGreen)
+                  ? Icon(Icons.check_circle, color: AppTheme.accentGreen)
                   : null,
               onTap: () => notifier.setThemeMode(ThemeMode.system),
             ),
           ),
-          const SizedBox(height: 28),
+          SizedBox(height: 28),
           Text('Chat wallpaper', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'Own Uganda-inspired patterns — not WhatsApp clones.',
             style: TextStyle(
-              color: isDarkChrome ? AppTheme.messengerMuted : const Color(0xFF667781),
+              color: isDarkChrome ? AppTheme.muted(context) : const Color(0xFF667781),
               fontSize: 13,
             ),
           ),

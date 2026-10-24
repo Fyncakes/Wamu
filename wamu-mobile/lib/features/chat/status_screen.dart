@@ -463,7 +463,7 @@ class _StatusScreenState extends ConsumerState<StatusScreen> {
           final hasMine = data.rings.any((r) => r.isMine);
           final titleColor = Theme.of(context).colorScheme.onSurface;
           final muted = Theme.of(context).brightness == Brightness.dark
-              ? AppTheme.messengerMuted
+              ? AppTheme.muted(context)
               : const Color(0xFF667781);
 
           return RefreshIndicator(
@@ -706,7 +706,7 @@ class _StatusCard extends StatelessWidget {
     final snippet = (previewText ?? '').trim();
 
     return Padding(
-      padding: const EdgeInsets.only(right: 10),
+      padding: EdgeInsets.only(right: 10),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
@@ -725,8 +725,8 @@ class _StatusCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: hasUpdate ? AppTheme.accentGreen : (dark
-                            ? const Color(0xFF3B4A54)
-                            : const Color(0xFFD1D7DB)),
+                            ? Color(0xFF3B4A54)
+                            : Color(0xFFD1D7DB)),
                         width: hasUpdate ? 2.5 : 1.5,
                       ),
                     ),
@@ -748,11 +748,11 @@ class _StatusCard extends StatelessWidget {
                       bottom: 6,
                       child: Material(
                         color: AppTheme.accentGreen,
-                        shape: const CircleBorder(),
+                        shape: CircleBorder(),
                         child: InkWell(
-                          customBorder: const CircleBorder(),
+                          customBorder: CircleBorder(),
                           onTap: onAdd ?? onTap,
-                          child: const Padding(
+                          child: Padding(
                             padding: EdgeInsets.all(4),
                             child: Icon(Icons.add, size: 16, color: Colors.black),
                           ),
@@ -761,7 +761,7 @@ class _StatusCard extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 label,
                 maxLines: 1,
@@ -769,7 +769,7 @@ class _StatusCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: dark ? AppTheme.messengerMuted : const Color(0xFF667781),
+                  color: dark ? AppTheme.muted(context) : const Color(0xFF667781),
                 ),
               ),
             ],

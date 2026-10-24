@@ -23,16 +23,16 @@ class NotificationSettingsScreen extends ConsumerWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+      appBar: AppBar(title: Text('Notifications')),
       body: ListView(
         children: [
           ListTile(
             leading: Icon(Icons.inbox_outlined, color: AppTheme.accentGreen),
-            title: const Text('Notification inbox'),
-            subtitle: const Text('Orders, payments, and system alerts'),
+            title: Text('Notification inbox'),
+            subtitle: Text('Orders, payments, and system alerts'),
             trailing: Icon(
               Icons.chevron_right,
-              color: dark ? AppTheme.messengerMuted : const Color(0xFF667781),
+              color: dark ? AppTheme.muted(context) : const Color(0xFF667781),
             ),
             onTap: () => context.push('/notifications'),
           ),

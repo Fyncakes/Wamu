@@ -32,14 +32,14 @@ class CustomerDashboardScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Customer dashboard')),
+      appBar: AppBar(title: Text('Customer dashboard')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           Text(
             'Everything for buying on Wamu',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.messengerMuted,
+                  color: AppTheme.muted(context),
                 ),
           ),
           const SizedBox(height: 12),

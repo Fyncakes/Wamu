@@ -450,7 +450,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                 ? '$_retryProvider payment confirmed'
                 : status == 'FAILED'
                     ? '$_retryProvider payment failed'
-                    : '$_retryProvider $status — still waiting on MoMo',
+                    : '$_retryProvider is waiting. Enter your MoMo PIN on the prompt on your phone.',
           ),
         ),
       );
@@ -701,8 +701,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
+      margin: EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
         border: Border.all(color: AppTheme.accentGreen.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(12),
@@ -712,10 +712,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
         children: [
           Text(
             rider != null ? '$name · $label' : label,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: TextStyle(fontWeight: FontWeight.w800),
           ),
           if (refCode.isNotEmpty)
-            Text(refCode, style: TextStyle(color: AppTheme.messengerMuted)),
+            Text(refCode, style: TextStyle(color: AppTheme.muted(context))),
           const SizedBox(height: 8),
           if (shopName != null && shopName.isNotEmpty)
             Text('From: $shopName', style: const TextStyle(fontWeight: FontWeight.w600)),

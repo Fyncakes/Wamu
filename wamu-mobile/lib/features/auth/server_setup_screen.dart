@@ -126,7 +126,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wamu server'),
+        title: Text('Wamu server'),
         automaticallyImplyLeading: widget.fromSettings,
       ),
       body: Container(
@@ -135,36 +135,36 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: dark
-                ? const [Color(0xFF0B141A), Color(0xFF111B21)]
-                : const [Color(0xFFE8F7EF), Color(0xFFFFFBF7)],
+                ? [Color(0xFF0B141A), Color(0xFF111B21)]
+                : [Color(0xFFE8F7EF), Color(0xFFFFFBF7)],
           ),
         ),
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24),
             children: [
               Text('Connect to Wamu', style: AppTheme.brandHero.copyWith(fontSize: 28)),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'Scan the QR on your computer’s /connect page, or paste the link below. '
                 'You only need to do this once per phone.',
                 style: theme.textTheme.bodyMedium,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _busy ? null : _scanQr,
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan QR code'),
+                icon: Icon(Icons.qr_code_scanner),
+                label: Text('Scan QR code'),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: Divider(color: dark ? AppTheme.messengerMuted : null)),
+                  Expanded(child: Divider(color: dark ? AppTheme.muted(context) : null)),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 12),
                     child: Text('or paste', style: theme.textTheme.bodySmall),
                   ),
-                  Expanded(child: Divider(color: dark ? AppTheme.messengerMuted : null)),
+                  Expanded(child: Divider(color: dark ? AppTheme.muted(context) : null)),
                 ],
               ),
               const SizedBox(height: 16),

@@ -229,7 +229,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ? 'Enter $_provider MoMo code…'
                           : _provider == 'MTN' &&
                                   (s == 'PENDING' || s == 'PROCESSING')
-                              ? 'Approve payment on your MTN MoMo phone…'
+                              ? 'MTN sent a prompt to your phone. Enter your MoMo PIN to finish the payment.'
                               : 'Confirming $_provider payment… ($s)';
             });
           },
@@ -417,21 +417,21 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   ],
                 ),
                 if (_fulfillment == 'DELIVERY') ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   TextField(
                     controller: _addressController,
                     textCapitalization: TextCapitalization.words,
                     decoration: InputDecoration(
                       labelText: 'Delivery address',
                       hintText: 'e.g. Kisaasi, Kampala',
-                      prefixIcon: const Icon(Icons.place_outlined),
+                      prefixIcon: Icon(Icons.place_outlined),
                       filled: true,
-                      fillColor: dark ? AppTheme.messengerElevated : const Color(0xFFF4F1EC),
+                      fillColor: dark ? AppTheme.messengerElevated : Color(0xFFF4F1EC),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   if (_quoting)
-                    const Row(
+                    Row(
                       children: [
                         SizedBox(
                           width: 16,
@@ -445,12 +445,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   else if (_quoteError != null)
                     Text(
                       _quoteError!,
-                      style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFFC0392B)),
+                      style: theme.textTheme.bodySmall?.copyWith(color: Color(0xFFC0392B)),
                     )
                   else if (_quotedFee > 0)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(12),
+                      padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppTheme.accentGreen.withValues(alpha: dark ? 0.14 : 0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -471,33 +471,33 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           Text(
                             'Rider may propose a different fare within Wamu limits — you approve before it applies.',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppTheme.messengerMuted,
+                              color: AppTheme.muted(context),
                             ),
                           ),
                         ],
                       ),
                     ),
                 ],
-                const SizedBox(height: 22),
+                SizedBox(height: 22),
                 Text('Pay with Mobile Money', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: _PayTile(
                         selected: _provider == 'MTN',
                         title: 'MTN MoMo',
-                        color: const Color(0xFFFFCC00),
+                        color: Color(0xFFFFCC00),
                         onTap: _loading ? null : () => setState(() => _provider = 'MTN'),
                       ),
                     ),
                     if (AppConfig.momoAirtelEnabled) ...[
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Expanded(
                         child: _PayTile(
                           selected: _provider == 'AIRTEL',
                           title: 'Airtel Money',
-                          color: const Color(0xFFE4002B),
+                          color: Color(0xFFE4002B),
                           onTap: _loading ? null : () => setState(() => _provider = 'AIRTEL'),
                         ),
                       ),
@@ -506,10 +506,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
                 if (!AppConfig.momoAirtelEnabled)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'Pay with MTN MoMo on this release. Airtel Money will return when our server is on a fixed IP.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.messengerMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.muted(context)),
                     ),
                   ),
                 const SizedBox(height: 12),

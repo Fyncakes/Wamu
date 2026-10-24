@@ -22,6 +22,16 @@ class AppTheme {
   static const Color messengerInput = Color(0xFF2A3942);
   static const Color messengerText = Color(0xFFE9EDEF);
   static const Color messengerMuted = Color(0xFF8696A0);
+  static const Color lightInk = Color(0xFF111B21);
+  static const Color lightMuted = Color(0xFF3D4F5C);
+
+  /// Title and body color that stays readable in dark and light appearance.
+  static Color ink(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? messengerText : lightInk;
+
+  /// Secondary text. Dark enough to read on a white background.
+  static Color muted(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? messengerMuted : lightMuted;
 
   static ThemeData get lightTheme {
     final base = ThemeData(
@@ -349,7 +359,7 @@ class AppTheme {
       labelLarge: GoogleFonts.outfit(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: Colors.white,
+        color: text,
       ),
     );
 
@@ -484,7 +494,7 @@ class AppTheme {
       labelLarge: GoogleFonts.outfit(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: Colors.white,
+        color: primaryDark,
       ),
     );
   }

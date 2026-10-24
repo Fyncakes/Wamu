@@ -316,25 +316,25 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       if (s == 'READ') {
         tick = const Icon(Icons.done_all, size: 15, color: Color(0xFF53BDEB));
       } else if (s == 'DELIVERED') {
-        tick = Icon(Icons.done_all, size: 15, color: AppTheme.messengerMuted.withValues(alpha: 0.9));
+        tick = Icon(Icons.done_all, size: 15, color: AppTheme.muted(context).withValues(alpha: 0.9));
       } else {
-        tick = Icon(Icons.done, size: 15, color: AppTheme.messengerMuted.withValues(alpha: 0.9));
+        tick = Icon(Icons.done, size: 15, color: AppTheme.muted(context).withValues(alpha: 0.9));
       }
     }
 
     return Row(
       children: [
         if (conv.muted) ...[
-          const Icon(Icons.volume_off, size: 14, color: AppTheme.messengerMuted),
-          const SizedBox(width: 4),
+          Icon(Icons.volume_off, size: 14, color: AppTheme.muted(context)),
+          SizedBox(width: 4),
         ],
         if (tick != null) ...[
           tick,
-          const SizedBox(width: 3),
+          SizedBox(width: 3),
         ],
         if (leadingIcon != null) ...[
-          Icon(leadingIcon, size: 16, color: AppTheme.messengerMuted),
-          const SizedBox(width: 4),
+          Icon(leadingIcon, size: 16, color: AppTheme.muted(context)),
+          SizedBox(width: 4),
         ],
         Expanded(
           child: Text(
@@ -342,7 +342,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: conv.unreadCount > 0 ? AppTheme.messengerText : AppTheme.messengerMuted,
+              color: conv.unreadCount > 0 ? AppTheme.ink(context) : AppTheme.muted(context),
               fontWeight: conv.unreadCount > 0 ? FontWeight.w500 : FontWeight.w400,
             ),
           ),
@@ -508,7 +508,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 prefixIcon: Icon(
                   Icons.search,
                   color: Theme.of(context).brightness == Brightness.dark
-                      ? AppTheme.messengerMuted
+                      ? AppTheme.muted(context)
                       : const Color(0xFF667781),
                 ),
               ),
@@ -641,7 +641,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         },
                         onLongPress: () => _showChatActions(conv),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
@@ -653,12 +653,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                       right: 0,
                                       bottom: 0,
                                       child: Container(
-                                        padding: const EdgeInsets.all(2),
-                                        decoration: const BoxDecoration(
+                                        padding: EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
                                           color: AppTheme.messengerBg,
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.star,
                                           size: 12,
                                           color: AppTheme.accentGreen,
@@ -667,7 +667,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                     ),
                                 ],
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -675,12 +675,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                     Row(
                                       children: [
                                         if (conv.pinned) ...[
-                                          const Icon(
+                                          Icon(
                                             Icons.push_pin,
                                             size: 14,
-                                            color: AppTheme.messengerMuted,
+                                            color: AppTheme.muted(context),
                                           ),
-                                          const SizedBox(width: 4),
+                                          SizedBox(width: 4),
                                         ],
                                         Expanded(
                                           child: Text(
@@ -699,7 +699,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                           style: theme.textTheme.bodySmall?.copyWith(
                                             color: conv.unreadCount > 0
                                                 ? AppTheme.accentGreen
-                                                : AppTheme.messengerMuted,
+                                                : AppTheme.muted(context),
                                             fontWeight: conv.unreadCount > 0
                                                 ? FontWeight.w600
                                                 : FontWeight.w400,
@@ -861,7 +861,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
     final choice = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppTheme.messengerElevated,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
@@ -871,21 +871,21 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
             ListTile(
               leading: ContactAvatar(name: phone, phone: phone, radius: 22),
               title: Text('$phone isn’t on Wamu yet'),
-              subtitle: const Text('Invite them by SMS or share a link'),
+              subtitle: Text('Invite them by SMS or share a link'),
             ),
-            const Divider(height: 1),
+            Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.sms_outlined, color: AppTheme.accentGreen),
-              title: const Text('Send SMS'),
+              leading: Icon(Icons.sms_outlined, color: AppTheme.accentGreen),
+              title: Text('Send SMS'),
               onTap: () => Navigator.pop(ctx, 'sms'),
             ),
             ListTile(
-              leading: const Icon(Icons.ios_share, color: AppTheme.accentGreen),
-              title: const Text('Share invite'),
+              leading: Icon(Icons.ios_share, color: AppTheme.accentGreen),
+              title: Text('Share invite'),
               onTap: () => Navigator.pop(ctx, 'share'),
             ),
             ListTile(
-              leading: const Icon(Icons.copy_outlined, color: AppTheme.messengerMuted),
+              leading: Icon(Icons.copy_outlined, color: AppTheme.muted(context)),
               title: const Text('Copy invite text'),
               onTap: () => Navigator.pop(ctx, 'copy'),
             ),
@@ -958,54 +958,54 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                     }
                     _invite(phone);
                   },
-            icon: const Icon(Icons.person_add_alt_1_outlined),
+            icon: Icon(Icons.person_add_alt_1_outlined),
           ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _dirLoading ? null : _loadDirectory,
-            icon: const Icon(Icons.refresh),
+            icon: Icon(Icons.refresh),
           ),
         ],
       ),
       body: _dirLoading
-          ? const LoadingView()
+          ? LoadingView()
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 Text(
                   'Pick someone below, or invite a +256 number that isn’t here yet.',
                   style: theme.textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 TextField(
                   controller: _searchController,
                   onChanged: (v) => setState(() => _query = v),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Search name or phone',
-                    prefixIcon: Icon(Icons.search, color: AppTheme.messengerMuted),
+                    prefixIcon: Icon(Icons.search, color: AppTheme.muted(context)),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Phone not in list',
                     hintText: '+2567…',
                   ),
                 ),
                 if (_error != null) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
                 ],
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _loading ? null : _lookupAndStart,
                         icon: _loading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
@@ -1013,17 +1013,17 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                                   color: Colors.black,
                                 ),
                               )
-                            : const Icon(Icons.chat_bubble_outline, size: 18),
+                            : Icon(Icons.chat_bubble_outline, size: 18),
                         label: Text(_loading ? 'Working…' : 'Chat / Invite'),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Row(
                   children: [
                     Text('On Wamu', style: theme.textTheme.titleMedium),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     if (_onWamuCount > 0)
                       Text(
                         '$_onWamuCount',
@@ -1034,13 +1034,13 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 if (_filtered.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Text(
                       'No matches — try another number or invite a friend.',
-                      style: TextStyle(color: AppTheme.messengerMuted),
+                      style: TextStyle(color: AppTheme.muted(context)),
                     ),
                   )
                 else
@@ -1076,12 +1076,12 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                               ),
                     );
                   }),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Text('Invite to Wamu', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: 4),
+                Text(
                   'Friends who may not have signed up yet',
-                  style: TextStyle(color: AppTheme.messengerMuted, fontSize: 13),
+                  style: TextStyle(color: AppTheme.muted(context), fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 ..._inviteSuggestions.map(
@@ -2436,13 +2436,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          insetPadding: EdgeInsets.symmetric(horizontal: 24),
           child: Material(
             color: dark ? AppTheme.messengerElevated : Colors.white,
             elevation: 8,
             borderRadius: BorderRadius.circular(28),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+              padding: EdgeInsets.fromLTRB(10, 10, 10, 6),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2456,45 +2456,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             onTap: () => Navigator.pop(ctx, 'react:$e'),
                             borderRadius: BorderRadius.circular(20),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                              child: Text(e, style: const TextStyle(fontSize: 26)),
+                              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                              child: Text(e, style: TextStyle(fontSize: 26)),
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 4,
                     children: [
                       TextButton.icon(
                         onPressed: () => Navigator.pop(ctx, 'reply'),
-                        icon: const Icon(Icons.reply, size: 18, color: AppTheme.accentGreen),
-                        label: const Text('Reply'),
+                        icon: Icon(Icons.reply, size: 18, color: AppTheme.accentGreen),
+                        label: Text('Reply'),
                       ),
                       TextButton.icon(
                         onPressed: () => Navigator.pop(ctx, 'forward'),
-                        icon: const Icon(Icons.shortcut, size: 18, color: AppTheme.accentGreen),
-                        label: const Text('Forward'),
+                        icon: Icon(Icons.shortcut, size: 18, color: AppTheme.accentGreen),
+                        label: Text('Forward'),
                       ),
                       TextButton.icon(
                         onPressed: () => Navigator.pop(ctx, 'select'),
-                        icon: const Icon(Icons.check_circle_outline, size: 18, color: AppTheme.accentGreen),
-                        label: const Text('Select'),
+                        icon: Icon(Icons.check_circle_outline, size: 18, color: AppTheme.accentGreen),
+                        label: Text('Select'),
                       ),
                       if (!msg.id.startsWith('local-'))
                         TextButton.icon(
                           onPressed: () => Navigator.pop(ctx, 'delete'),
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                          label: const Text('Delete'),
+                          icon: Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                          label: Text('Delete'),
                         ),
                       TextButton.icon(
                         onPressed: () => Navigator.pop(ctx, 'copy'),
                         icon: Icon(
                           Icons.copy_outlined,
                           size: 18,
-                          color: dark ? AppTheme.messengerMuted : const Color(0xFF667781),
+                          color: dark ? AppTheme.muted(context) : const Color(0xFF667781),
                         ),
                         label: const Text('Copy'),
                       ),
@@ -2754,7 +2754,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!msg.isMine) return const SizedBox.shrink();
     final s = msg.status.toUpperCase();
     if (s == 'SENDING' || s == 'QUEUED') {
-      return const Icon(Icons.schedule, size: 14, color: AppTheme.messengerMuted);
+      return Icon(Icons.schedule, size: 14, color: AppTheme.muted(context));
     }
     if (s == 'FAILED') {
       return const Icon(Icons.error_outline, size: 14, color: Colors.orangeAccent);
@@ -2763,9 +2763,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return const Icon(Icons.done_all, size: 16, color: Color(0xFF53BDEB));
     }
     if (s == 'DELIVERED') {
-      return const Icon(Icons.done_all, size: 16, color: AppTheme.messengerMuted);
+      return Icon(Icons.done_all, size: 16, color: AppTheme.muted(context));
     }
-    return const Icon(Icons.done, size: 16, color: AppTheme.messengerMuted);
+    return Icon(Icons.done, size: 16, color: AppTheme.muted(context));
   }
 
   Widget _quoteBlock(MessageReplyPreview reply, {required bool mine}) {
@@ -2786,12 +2786,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 : reply.body;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      margin: EdgeInsets.only(bottom: 6),
+      padding: EdgeInsets.fromLTRB(8, 6, 8, 6),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: mine ? 0.18 : 0.22),
         borderRadius: BorderRadius.circular(8),
-        border: const Border(
+        border: Border(
           left: BorderSide(color: AppTheme.accentGreen, width: 3),
         ),
       ),
@@ -2802,20 +2802,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             senderLabel,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppTheme.accentGreen,
             ),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Text(
             label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
-              color: mine ? Colors.white.withValues(alpha: 0.85) : AppTheme.messengerMuted,
+              color: mine ? Colors.white.withValues(alpha: 0.85) : AppTheme.muted(context),
             ),
           ),
         ],
@@ -2921,11 +2921,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final canAct = pending && !msg.isMine && !_isMerchantInChat && !_ordering;
     return Container(
       width: MediaQuery.of(context).size.width * 0.78,
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF1A2430)
-            : const Color(0xFFF5F8FF),
+            ? Color(0xFF1A2430)
+            : Color(0xFFF5F8FF),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blueGrey.withValues(alpha: 0.35)),
       ),
@@ -2934,7 +2934,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Delivery fare offer',
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
@@ -2948,16 +2948,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   color: status == 'ACCEPTED'
                       ? AppTheme.accentGreen
                       : status == 'DECLINED' || status == 'EXPIRED'
-                          ? const Color(0xFFC0392B)
-                          : AppTheme.messengerMuted,
+                          ? Color(0xFFC0392B)
+                          : AppTheme.muted(context),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             formatUgx(proposed),
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 18,
               color: AppTheme.accentGreen,
@@ -2966,21 +2966,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Text(
             'Was ${formatUgx(original)}'
             '${km != null ? ' · ~$km km road' : ''}',
-            style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted),
+            style: TextStyle(fontSize: 12, color: AppTheme.muted(context)),
           ),
           if ((card['pickup_address'] ?? card['dropoff_address']) != null) ...[
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               '${card['pickup_address'] ?? 'Pickup'} → ${card['dropoff_address'] ?? 'Dropoff'}',
-              style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted, height: 1.3),
+              style: TextStyle(fontSize: 12, color: AppTheme.muted(context), height: 1.3),
             ),
           ],
           if (reason != null && reason.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(reason, style: const TextStyle(fontSize: 13)),
+            SizedBox(height: 6),
+            Text(reason, style: TextStyle(fontSize: 13)),
           ],
           if (canAct) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -2990,22 +2990,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       backgroundColor: AppTheme.accentGreen,
                       foregroundColor: Colors.black,
                     ),
-                    child: const Text('Accept'),
+                    child: Text('Accept'),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _resolveFareOffer(card, accept: false),
-                    child: const Text('Decline'),
+                    child: Text('Decline'),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               'Acceptance is recorded by Wamu — chat text alone is not enough.',
-              style: TextStyle(fontSize: 11, color: AppTheme.messengerMuted),
+              style: TextStyle(fontSize: 11, color: AppTheme.muted(context)),
             ),
           ],
         ],
@@ -3032,7 +3032,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ? '$_payProvider paid — delivery is being assigned'
                 : status == 'FAILED'
                     ? '$_payProvider payment failed — try again'
-                    : '$_payProvider $status — we will update when MoMo confirms',
+                    : '$_payProvider is waiting. Enter your MoMo PIN on the prompt on your phone.',
           ),
         ),
       );
@@ -3227,11 +3227,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final orderId = card['order_id']?.toString();
     return Container(
       width: MediaQuery.of(context).size.width * 0.78,
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF1A2E24)
-            : const Color(0xFFF0FFF4),
+            ? Color(0xFF1A2E24)
+            : Color(0xFFF0FFF4),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.accentGreen.withValues(alpha: 0.45)),
       ),
@@ -3243,35 +3243,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               Expanded(
                 child: Text(
                   card['business_name']?.toString() ?? 'Order',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                 ),
               ),
               if (card['merchant_receipt'] == true)
-                const Text(
+                Text(
                   'Receipt',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                 ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(itemLine, style: TextStyle(color: AppTheme.messengerMuted, height: 1.3)),
-          const SizedBox(height: 8),
+          SizedBox(height: 4),
+          Text(itemLine, style: TextStyle(color: AppTheme.muted(context), height: 1.3)),
+          SizedBox(height: 8),
           Text(
             formatUgx(total),
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 18,
               color: AppTheme.accentGreen,
             ),
           ),
           if (card['delivery_address'] != null) ...[
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               'Deliver to ${card['delivery_address']}',
-              style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted),
+              style: TextStyle(fontSize: 12, color: AppTheme.muted(context)),
             ),
           ],
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           if (canPay) ...[
             MomoProviderPicker(
               value: _payProvider,
@@ -3279,7 +3279,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               enabled: !_ordering,
               onChanged: (v) => setState(() => _payProvider = v),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -3292,14 +3292,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   _ordering
                       ? 'Paying…'
                       : (card['pay_cta']?.toString() ?? 'Pay with $_payProvider'),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ),
           ] else if (canEdit && orderId != null) ...[
             Text(
               'Waiting for buyer to pay',
-              style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted),
+              style: TextStyle(fontSize: 12, color: AppTheme.muted(context)),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -3359,8 +3359,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     final dark = theme.brightness == Brightness.dark;
     final onMine = msg.isMine
-        ? (dark ? Colors.white : const Color(0xFF111B21))
-        : (dark ? AppTheme.messengerText : const Color(0xFF111B21));
+        ? (dark ? Colors.white : Color(0xFF111B21))
+        : (dark ? AppTheme.ink(context) : const Color(0xFF111B21));
     final kids = <Widget>[];
     if (msg.isForwarded) {
       kids.add(
@@ -3464,7 +3464,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return Text(
         msg.content,
         style: TextStyle(
-          color: AppTheme.messengerMuted,
+          color: AppTheme.muted(context),
           fontStyle: FontStyle.italic,
           fontSize: 13,
         ),
@@ -3548,7 +3548,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     fontWeight: FontWeight.w400,
                                     color: isOnline
                                         ? AppTheme.accentGreen
-                                        : AppTheme.messengerMuted,
+                                        : AppTheme.muted(context),
                                   ),
                                 );
                               },
@@ -3686,22 +3686,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             }
                                           },
                                     child: Container(
-                                      margin: const EdgeInsets.only(bottom: 6),
-                                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+                                      margin: EdgeInsets.only(bottom: 6),
+                                      padding: EdgeInsets.fromLTRB(10, 8, 10, 6),
                                       constraints: BoxConstraints(
                                         maxWidth: MediaQuery.of(context).size.width * 0.78,
                                       ),
                                       decoration: BoxDecoration(
                                         color: msg.isMine
                                             ? (dark
-                                                ? const Color(0xFF005C4B)
-                                                : const Color(0xFFD9FDD3))
+                                                ? Color(0xFF005C4B)
+                                                : Color(0xFFD9FDD3))
                                             : (dark
                                                 ? AppTheme.messengerElevated
                                                 : Colors.white),
                                         borderRadius: BorderRadius.only(
-                                          topLeft: const Radius.circular(12),
-                                          topRight: const Radius.circular(12),
+                                          topLeft: Radius.circular(12),
+                                          topRight: Radius.circular(12),
                                           bottomLeft: Radius.circular(msg.isMine ? 12 : 4),
                                           bottomRight: Radius.circular(msg.isMine ? 4 : 12),
                                         ),
@@ -3716,7 +3716,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             Align(
                                               alignment: Alignment.centerLeft,
                                               child: Padding(
-                                                padding: const EdgeInsets.only(bottom: 4),
+                                                padding: EdgeInsets.only(bottom: 4),
                                                 child: Icon(
                                                   selected
                                                       ? Icons.check_circle
@@ -3724,7 +3724,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                   size: 20,
                                                   color: selected
                                                       ? AppTheme.accentGreen
-                                                      : AppTheme.messengerMuted,
+                                                      : AppTheme.muted(context),
                                                 ),
                                               ),
                                             ),
@@ -3746,7 +3746,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                 : _bubbleBody(msg, theme),
                                           ),
                                           if (last.reactions.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
+                                            SizedBox(height: 4),
                                             Align(
                                               alignment: Alignment.centerLeft,
                                               child: Wrap(
@@ -3754,7 +3754,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                 children: last.reactions.entries
                                                     .map(
                                                       (e) => Container(
-                                                        padding: const EdgeInsets.symmetric(
+                                                        padding: EdgeInsets.symmetric(
                                                           horizontal: 6,
                                                           vertical: 2,
                                                         ),
@@ -3764,7 +3764,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                         ),
                                                         child: Text(
                                                           '${e.key} ${e.value}',
-                                                          style: const TextStyle(fontSize: 12),
+                                                          style: TextStyle(fontSize: 12),
                                                         ),
                                                       ),
                                                     )
@@ -3772,7 +3772,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(height: 2),
+                                          SizedBox(height: 2),
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -3782,7 +3782,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                   fontSize: 11,
                                                   color: msg.isMine
                                                       ? Colors.white.withValues(alpha: 0.65)
-                                                      : AppTheme.messengerMuted,
+                                                      : AppTheme.muted(context),
                                                 ),
                                               ),
                                               if (msg.isMine) ...[
@@ -3804,7 +3804,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       if (_replyTo != null)
                         Container(
                           color: AppTheme.messengerSurface,
-                          padding: const EdgeInsets.fromLTRB(12, 8, 4, 4),
+                          padding: EdgeInsets.fromLTRB(12, 8, 4, 4),
                           child: Row(
                             children: [
                               Container(
@@ -3812,12 +3812,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 height: 36,
                                 color: AppTheme.accentGreen,
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Replying',
                                       style: TextStyle(
                                         color: AppTheme.accentGreen,
@@ -3829,8 +3829,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       _mediaAwarePreview(_replyTo!),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: AppTheme.messengerMuted,
+                                      style: TextStyle(
+                                        color: AppTheme.muted(context),
                                         fontSize: 13,
                                       ),
                                     ),
@@ -3869,7 +3869,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       setState(() {});
                                     },
                                     child: Center(
-                                      child: Text(e, style: const TextStyle(fontSize: 24)),
+                                      child: Text(e, style: TextStyle(fontSize: 24)),
                                     ),
                                   ),
                                 )
@@ -3880,7 +3880,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         top: false,
                         child: Container(
                           color: AppTheme.messengerSurface,
-                          padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+                          padding: EdgeInsets.fromLTRB(6, 6, 6, 8),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
@@ -3901,7 +3901,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                           _showEmoji
                                               ? Icons.keyboard_alt_outlined
                                               : Icons.emoji_emotions_outlined,
-                                          color: AppTheme.messengerMuted,
+                                          color: AppTheme.muted(context),
                                           size: 22,
                                         ),
                                       ),
@@ -3913,7 +3913,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                           maxLines: 8,
                                           keyboardType: TextInputType.multiline,
                                           textInputAction: TextInputAction.newline,
-                                          style: const TextStyle(color: AppTheme.messengerText),
+                                          style: TextStyle(color: AppTheme.ink(context)),
                                           decoration: InputDecoration(
                                             hintText:
                                                 _recording
@@ -3946,9 +3946,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       IconButton(
                                         tooltip: 'Attach',
                                         onPressed: _uploading ? null : _showAttachSheet,
-                                        icon: const Icon(
+                                        icon: Icon(
                                           Icons.attach_file,
-                                          color: AppTheme.messengerMuted,
+                                          color: AppTheme.muted(context),
                                           size: 22,
                                         ),
                                       ),
@@ -3957,9 +3957,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         onPressed: _uploading
                                             ? null
                                             : () => _pickPhoto(source: ImageSource.camera),
-                                        icon: const Icon(
+                                        icon: Icon(
                                           Icons.photo_camera_outlined,
-                                          color: AppTheme.messengerMuted,
+                                          color: AppTheme.muted(context),
                                           size: 22,
                                         ),
                                       ),

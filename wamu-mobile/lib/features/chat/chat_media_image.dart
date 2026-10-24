@@ -97,11 +97,11 @@ class _ChatMediaImageState extends ConsumerState<ChatMediaImage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: AppTheme.accentGreen, size: 32),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppTheme.messengerMuted, fontSize: 12),
+            style: TextStyle(color: AppTheme.muted(context), fontSize: 12),
           ),
         ],
       ),

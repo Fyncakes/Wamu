@@ -114,21 +114,21 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
           return RefreshIndicator(
             onRefresh: () async => setState(() => _future = _load()),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
                 Text(name, style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 )),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'Live figures from your Wamu records · not demo data',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.messengerMuted,
+                    color: AppTheme.muted(context),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 SegmentedButton<String>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(value: '7d', label: Text('7d')),
                     ButtonSegment(value: '30d', label: Text('30d')),
                     ButtonSegment(value: '90d', label: Text('90d')),
@@ -136,14 +136,14 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                   selected: {_period},
                   onSelectionChanged: (s) => _setPeriod(s.first),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Text(
                   'At a glance',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -154,7 +154,7 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                         emphasize: true,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     Expanded(
                       child: _KpiCard(
                         label: 'Net earnings',
@@ -165,7 +165,7 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
@@ -178,7 +178,7 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                             .join(' · '),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     Expanded(
                       child: _KpiCard(
                         label: 'Needs you',
@@ -189,14 +189,14 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _BreakdownRow(
                   settled: settled,
                   outstanding: outstanding,
                   commission: commission,
                   refunds: refunds,
                 ),
-                const SizedBox(height: 22),
+                SizedBox(height: 22),
                 _SalesTrendChart(
                   points: trend,
                   period: _period,
@@ -204,7 +204,7 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                   dateTo: dash['date_to']?.toString(),
                   totalSalesMinor: sales,
                 ),
-                const SizedBox(height: 22),
+                SizedBox(height: 22),
                 Row(
                   children: [
                     Expanded(
@@ -217,17 +217,17 @@ class _MerchantDashboardScreenState extends ConsumerState<MerchantDashboardScree
                     ),
                     TextButton(
                       onPressed: () => context.push('/business-owner/orders'),
-                      child: const Text('All orders'),
+                      child: Text('All orders'),
                     ),
                   ],
                 ),
                 if (attention.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text(
                       'No orders waiting on you right now.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.messengerMuted,
+                        color: AppTheme.muted(context),
                       ),
                     ),
                   )
@@ -302,7 +302,7 @@ class _KpiCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         color: alert
@@ -316,7 +316,7 @@ class _KpiCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
@@ -326,13 +326,13 @@ class _KpiCard extends StatelessWidget {
             ),
           ),
           if (hint != null && hint!.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               hint!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.messengerMuted,
+                color: AppTheme.muted(context),
                 fontSize: 11,
               ),
             ),
@@ -535,21 +535,21 @@ class _SalesTrendChartState extends State<_SalesTrendChart> {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(
           isWeekly
               ? 'Money collected each week (successful payments only)'
               : 'Money collected each day (successful payments only)',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.messengerMuted,
+            color: AppTheme.muted(context),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         if (series.isEmpty || series.every((d) => d.salesMinor <= 0))
           Container(
             height: 160,
             alignment: Alignment.center,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: theme.colorScheme.surfaceContainerHighest,
@@ -560,7 +560,7 @@ class _SalesTrendChartState extends State<_SalesTrendChart> {
               'will show here in UGX.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.messengerMuted,
+                color: AppTheme.muted(context),
               ),
             ),
           )
@@ -580,7 +580,7 @@ class _SalesTrendChartState extends State<_SalesTrendChart> {
           if (_selected != null &&
               _selected! >= 0 &&
               _selected! < series.length) ...[
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             _DayDetailCard(
               day: series[_selected!],
               isWeekly: isWeekly,
@@ -588,19 +588,19 @@ class _SalesTrendChartState extends State<_SalesTrendChart> {
               dayLabel: _dayLabel,
             ),
           ] else ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               'Tap a bar to see that ${isWeekly ? 'week' : 'day'}’s amount',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.messengerMuted,
+                color: AppTheme.muted(context),
               ),
             ),
           ],
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             '$periodLabel · total ${formatUgx(widget.totalSalesMinor)}',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.messengerMuted,
+              color: AppTheme.muted(context),
             ),
           ),
         ],
@@ -737,7 +737,7 @@ class _LabeledBarChart extends StatelessWidget {
                 : 5;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(4, 12, 8, 8),
+      padding: EdgeInsets.fromLTRB(4, 12, 8, 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: theme.colorScheme.surfaceContainerHighest,
@@ -759,21 +759,21 @@ class _LabeledBarChart extends StatelessWidget {
                       Text(
                         compactUgx(maxV),
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppTheme.messengerMuted,
+                          color: AppTheme.muted(context),
                           fontSize: 10,
                         ),
                       ),
                       Text(
                         compactUgx(midV),
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppTheme.messengerMuted,
+                          color: AppTheme.muted(context),
                           fontSize: 10,
                         ),
                       ),
                       Text(
                         '0',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppTheme.messengerMuted,
+                          color: AppTheme.muted(context),
                           fontSize: 10,
                         ),
                       ),
@@ -876,7 +876,7 @@ class _LabeledBarChart extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.clip,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: AppTheme.messengerMuted,
+                                  color: AppTheme.muted(context),
                                   fontSize: 9,
                                 ),
                               )
@@ -915,7 +915,7 @@ class _DayDetailCard extends StatelessWidget {
         : '${weekdayShort(day.date)}, ${dayLabel(day.date, withMonth: true)}';
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: AppTheme.accentGreen.withValues(alpha: 0.12),
@@ -932,7 +932,7 @@ class _DayDetailCard extends StatelessWidget {
                 Text(
                   title,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.messengerMuted,
+                    color: AppTheme.muted(context),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1091,44 +1091,44 @@ class _MerchantReportsScreenState extends ConsumerState<MerchantReportsScreen> {
         : '${DateFormat.yMMMd().format(_range!.start)} – ${DateFormat.yMMMd().format(_range!.end)}';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reports')),
+      appBar: AppBar(title: Text('Reports')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           Text(
             'Download CSV (Excel) or PDF. Figures match your live ledger and payments.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppTheme.messengerMuted,
+              color: AppTheme.muted(context),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.date_range, color: AppTheme.accentGreen),
-            title: const Text('Date range'),
+            leading: Icon(Icons.date_range, color: AppTheme.accentGreen),
+            title: Text('Date range'),
             subtitle: Text(rangeLabel),
-            trailing: TextButton(onPressed: _pickRange, child: const Text('Change')),
+            trailing: TextButton(onPressed: _pickRange, child: Text('Change')),
           ),
           if (_error != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.only(bottom: 8),
               child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
             ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           for (final r in _reports) ...[
             Card(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: EdgeInsets.only(bottom: 10),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                padding: EdgeInsets.fromLTRB(14, 12, 14, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(r.$2, style: const TextStyle(fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
+                    Text(r.$2, style: TextStyle(fontWeight: FontWeight.w800)),
+                    SizedBox(height: 4),
                     Text(
                       r.$3,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.messengerMuted,
+                        color: AppTheme.muted(context),
                       ),
                     ),
                     const SizedBox(height: 10),

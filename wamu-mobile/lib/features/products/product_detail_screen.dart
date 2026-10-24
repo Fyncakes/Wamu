@@ -131,7 +131,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       width: double.infinity,
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                      padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -141,7 +141,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                   fontWeight: FontWeight.w800,
                                 ),
                           ),
-                          const SizedBox(height: 10),
+                          SizedBox(height: 10),
                           Text(
                             formatUgx(product.price),
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -149,21 +149,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                   fontWeight: FontWeight.w800,
                                 ),
                           ),
-                          const SizedBox(height: 18),
+                          SizedBox(height: 18),
                           Text(
                             'Description',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           Text(
                             description.isNotEmpty
                                 ? description
                                 : 'No description provided for this product.',
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                   height: 1.45,
-                                  color: AppTheme.messengerMuted,
+                                  color: AppTheme.muted(context),
                                 ),
                           ),
                           if (product.businessId != null) ...[
@@ -301,22 +301,22 @@ class _ProductRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: EdgeInsets.only(top: 8, bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Text(
               title,
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
             child: Text(
               subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.messengerMuted),
+              style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.muted(context)),
             ),
           ),
           SizedBox(

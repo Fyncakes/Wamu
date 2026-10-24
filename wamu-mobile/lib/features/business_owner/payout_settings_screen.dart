@@ -118,13 +118,13 @@ class _PayoutSettingsScreenState extends ConsumerState<PayoutSettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Payout settings')),
+      appBar: AppBar(title: Text('Payout settings')),
       body: _loading
-          ? const LoadingView()
+          ? LoadingView()
           : _biz == null
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(24),
                     child: Text(
                       'Create a business first, then set where MoMo payouts should land.',
                       textAlign: TextAlign.center,
@@ -133,20 +133,20 @@ class _PayoutSettingsScreenState extends ConsumerState<PayoutSettingsScreen> {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 32),
                   children: [
                     if (_error != null)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: EdgeInsets.only(bottom: 12),
                         child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
                       ),
                     Text(_biz!.name, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       'Disbursements go to this number after a customer pays. '
                       'If empty, Wamu falls back to your business phone.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.messengerMuted,
+                        color: AppTheme.muted(context),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -173,11 +173,11 @@ class _PayoutSettingsScreenState extends ConsumerState<PayoutSettingsScreen> {
                               if (v != null) setState(() => _provider = v);
                             },
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20),
                     ElevatedButton(
                       onPressed: _saving ? null : _save,
                       child: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 22,
                               height: 22,
                               child: CircularProgressIndicator(
@@ -185,15 +185,15 @@ class _PayoutSettingsScreenState extends ConsumerState<PayoutSettingsScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Save payout destination'),
+                          : Text('Save payout destination'),
                     ),
-                    const SizedBox(height: 28),
+                    SizedBox(height: 28),
                     Text('Recent payouts', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     if (_payouts.isEmpty)
-                      const Text(
+                      Text(
                         'No disbursements yet — they’ll show here after paid orders.',
-                        style: TextStyle(color: AppTheme.messengerMuted),
+                        style: TextStyle(color: AppTheme.muted(context)),
                       )
                     else
                       ..._payouts.take(20).map((p) {

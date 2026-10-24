@@ -148,78 +148,78 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: dark
-                ? const [Color(0xFF0B141A), Color(0xFF0D3B2E), Color(0xFF0B141A)]
-                : const [Color(0xFFE8F7EF), Color(0xFFFFFBF7), Color(0xFFF5E6D3)],
+                ? [Color(0xFF0B141A), Color(0xFF0D3B2E), Color(0xFF0B141A)]
+                : [Color(0xFFE8F7EF), Color(0xFFFFFBF7), Color(0xFFF5E6D3)],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+            padding: EdgeInsets.fromLTRB(24, 8, 24, 24),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Spacer(),
-                  const WamuLogo(size: 96),
-                  const SizedBox(height: 20),
+                  Spacer(),
+                  WamuLogo(size: 96),
+                  SizedBox(height: 20),
                   Text(
                     AppConfig.appName,
                     style: AppTheme.brandHero.copyWith(fontSize: 42),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   Text(
                     AppConfig.tagline,
                     style: AppTheme.tagline.copyWith(fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Text(
                     AppConfig.supportLine,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: dark ? AppTheme.messengerMuted : AppTheme.warmBrown,
+                      color: dark ? AppTheme.muted(context) : AppTheme.warmBrown,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 36),
+                  SizedBox(height: 36),
                   Text(
                     'Your phone number',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: '+256 7XX XXX XXX',
                       prefixIcon: Icon(Icons.phone_iphone),
                     ),
                     validator: (v) =>
                         v != null && isValidUgPhone(v) ? null : 'Enter a valid Ugandan number',
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: 18),
                   ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     child: _loading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Continue'),
+                        : Text('Continue'),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: _loading ? null : _scanAccountQr,
-                    icon: const Icon(Icons.qr_code_scanner),
+                    icon: Icon(Icons.qr_code_scanner),
                     label: Text(kIsWeb ? 'Paste account QR link' : 'Scan to sign in'),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: 18),
                   Text(
-                    'For this trial, the code is 123456.',
+                    'We will text a 6-digit code to this number.',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: dark ? AppTheme.messengerMuted : AppTheme.warmBrown,
+                      color: dark ? AppTheme.muted(context) : AppTheme.warmBrown,
                     ),
                     textAlign: TextAlign.center,
                   ),

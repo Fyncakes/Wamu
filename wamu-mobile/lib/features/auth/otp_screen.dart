@@ -72,9 +72,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify your number')),
+      appBar: AppBar(title: Text('Verify your number')),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -82,7 +82,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               'Enter the 6-digit code we sent to',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             Text(
               _phone.isEmpty ? '…' : _phone,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -90,25 +90,25 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     fontWeight: FontWeight.w700,
                   ),
             ),
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             TextField(
               controller: _otpController,
               keyboardType: TextInputType.number,
               maxLength: 6,
               autofocus: true,
               textAlign: TextAlign.center,
-              style: const TextStyle(letterSpacing: 8, fontSize: 24, fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
+              style: TextStyle(letterSpacing: 8, fontSize: 24, fontWeight: FontWeight.w700),
+              decoration: InputDecoration(
                 labelText: 'Verification code',
                 counterText: '',
               ),
               onSubmitted: (_) => _verify(),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(
               'Check the SMS on your phone. Delivery can take up to a minute on MTN or Airtel.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.messengerMuted,
+                    color: AppTheme.muted(context),
                   ),
               textAlign: TextAlign.center,
             ),

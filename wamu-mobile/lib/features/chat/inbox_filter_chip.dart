@@ -18,7 +18,7 @@ class InboxFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final unselectedFg = dark ? AppTheme.messengerText : const Color(0xFF111B21);
+    final unselectedFg = dark ? AppTheme.ink(context) : const Color(0xFF111B21);
     final selectedBg = dark ? const Color(0xFF0A3D2E) : const Color(0xFFD7F5E5);
     final unselectedBg = dark ? AppTheme.messengerElevated : const Color(0xFFF0F2F5);
 

@@ -510,17 +510,17 @@ class _YouTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: CircleAvatar(
         radius: 22,
-        backgroundColor: dark ? AppTheme.messengerElevated : const Color(0xFFF0F2F5),
+        backgroundColor: dark ? AppTheme.messengerElevated : Color(0xFFF0F2F5),
         child: Icon(icon, color: AppTheme.accentGreen, size: 22),
       ),
       title: Text(title),
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          color: dark ? const Color(0xFFB8C0C4) : const Color(0xFF667781),
+          color: dark ? Color(0xFFB8C0C4) : Color(0xFF667781),
           fontSize: 13,
           height: 1.3,
         ),
@@ -530,7 +530,7 @@ class _YouTile extends StatelessWidget {
           (onTap != null
               ? Icon(
                   Icons.chevron_right,
-                  color: dark ? AppTheme.messengerMuted : const Color(0xFF667781),
+                  color: dark ? AppTheme.muted(context) : const Color(0xFF667781),
                   size: 20,
                 )
               : null),

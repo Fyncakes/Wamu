@@ -193,9 +193,9 @@ class _ReceiptComposerSheetState extends State<_ReceiptComposerSheet> {
                     final i = e.key;
                     final line = e.value;
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
+                      margin: EdgeInsets.only(bottom: 10),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -204,19 +204,19 @@ class _ReceiptComposerSheetState extends State<_ReceiptComposerSheet> {
                                 Expanded(
                                   child: Text(
                                     line.name,
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                    style: TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                 ),
                                 IconButton(
                                   tooltip: 'Remove',
                                   onPressed: () => setState(() => _lines.removeAt(i)),
-                                  icon: const Icon(Icons.delete_outline),
+                                  icon: Icon(Icons.delete_outline),
                                 ),
                               ],
                             ),
                             Text(
                               'Listed ${formatUgx(line.product.price)}',
-                              style: TextStyle(fontSize: 12, color: AppTheme.messengerMuted),
+                              style: TextStyle(fontSize: 12, color: AppTheme.muted(context)),
                             ),
                             const SizedBox(height: 8),
                             Row(

@@ -32,7 +32,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
 
   void _armAuto() {
     _auto?.cancel();
-    _auto = Timer(const Duration(seconds: 5), () {
+    _auto = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       _next();
     });
@@ -104,7 +104,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
       return;
     }
     _page.nextPage(
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
     );
   }
@@ -112,7 +112,7 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
   void _back() {
     if (_index <= 0) return;
     _page.previousPage(
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
     );
   }
@@ -141,27 +141,27 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: dark
-                ? const [Color(0xFF0B141A), Color(0xFF0D3B2E)]
-                : const [Color(0xFFE8F7EF), Color(0xFFFFFBF7)],
+                ? [Color(0xFF0B141A), Color(0xFF0D3B2E)]
+                : [Color(0xFFE8F7EF), Color(0xFFFFFBF7)],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
                 child: Row(
                   children: [
                     if (_index > 0)
-                      TextButton(onPressed: _back, child: const Text('Back'))
+                      TextButton(onPressed: _back, child: Text('Back'))
                     else
-                      const SizedBox(width: 64),
+                      SizedBox(width: 64),
                     Expanded(
                       child: Text(
                         progressLabel,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.messengerMuted,
+                          color: AppTheme.muted(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -184,17 +184,17 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                   itemBuilder: (context, i) {
                     final s = _steps[i];
                     return Padding(
-                      padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
+                      padding: EdgeInsets.fromLTRB(28, 12, 28, 8),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Spacer(flex: 1),
+                          Spacer(flex: 1),
                           if (s.isWelcome) ...[
-                            const WamuLogo(size: 88),
-                            const SizedBox(height: 20),
+                            WamuLogo(size: 88),
+                            SizedBox(height: 20),
                             Text(
                               'Wamu',
-                              textAlign: TextAlign.start,
+                              textAlign: TextAlign.center,
                               style: AppTheme.brandHero.copyWith(fontSize: 40),
                             ),
                           ] else
@@ -208,26 +208,27 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                                 color: AppTheme.accentGreen,
                               ),
                             ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: 24),
                           Text(
                             s.title,
-                            textAlign: TextAlign.start,
+                            textAlign: TextAlign.center,
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           Text(
                             s.body,
-                            textAlign: TextAlign.start,
+                            textAlign: TextAlign.center,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               height: 1.45,
                             ),
                           ),
                           if (s.tip != null) ...[
-                            const SizedBox(height: 18),
+                            SizedBox(height: 18),
                             Container(
-                              padding: const EdgeInsets.all(12),
+                              width: double.infinity,
+                              padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 color: dark
@@ -236,9 +237,9 @@ class _WelcomeTutorialScreenState extends ConsumerState<WelcomeTutorialScreen> {
                               ),
                               child: Text(
                                 s.tip!,
-                                textAlign: TextAlign.start,
+                                textAlign: TextAlign.center,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.messengerMuted,
+                                  color: AppTheme.muted(context),
                                 ),
                               ),
                             ),

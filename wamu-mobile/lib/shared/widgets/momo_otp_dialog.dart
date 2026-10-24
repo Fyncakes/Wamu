@@ -104,20 +104,20 @@ class _MomoOtpDialogState extends State<_MomoOtpDialog> {
         children: [
           Text(
             'Enter the code we sent by SMS to approve this payment.',
-            style: TextStyle(color: AppTheme.messengerMuted),
+            style: TextStyle(color: AppTheme.muted(context)),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           TextField(
             controller: _controller,
             autofocus: true,
             keyboardType: TextInputType.number,
             maxLength: 6,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               letterSpacing: 8,
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppTheme.messengerText,
+              color: AppTheme.ink(context),
             ),
             decoration: const InputDecoration(
               labelText: 'MoMo OTP',

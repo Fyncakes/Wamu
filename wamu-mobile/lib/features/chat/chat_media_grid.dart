@@ -39,14 +39,14 @@ class ChatMediaGrid extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (imgs.any((m) => m.isForwarded))
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 4),
               child: Text(
                 'Forwarded',
                 style: TextStyle(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
-                  color: AppTheme.messengerMuted,
+                  color: AppTheme.muted(context),
                 ),
               ),
             ),
@@ -68,7 +68,7 @@ class ChatMediaGrid extends StatelessWidget {
                             color: Colors.black54,
                             child: Text(
                               '+$extra',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w600,
@@ -82,10 +82,10 @@ class ChatMediaGrid extends StatelessWidget {
             ],
           ),
           if (_sharedCaption(imgs) != null) ...[
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             Text(
               _sharedCaption(imgs)!,
-              style: const TextStyle(color: AppTheme.messengerText, height: 1.3),
+              style: TextStyle(color: AppTheme.ink(context), height: 1.3),
             ),
           ],
         ],

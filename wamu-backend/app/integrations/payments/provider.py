@@ -192,7 +192,7 @@ class MTNAdapter(PaymentProvider):
             "currency": momo_currency,
             "externalId": external_id,
             "payer": {"partyIdType": "MSISDN", "partyId": (phone or "").lstrip("+")},
-            "payerMessage": "Wamu payment",
+            "payerMessage": "Enter your MoMo PIN to pay Wamu",
             "payeeNote": reference,
         }
         headers = {
