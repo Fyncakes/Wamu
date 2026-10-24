@@ -140,8 +140,8 @@ export default function LoginPage() {
                     className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 shadow-sm outline-none ring-wamu-500 focus:border-wamu-500 focus:ring-2"
                   />
                   <p className="mt-1.5 text-xs text-slate-400">
-                    Demo admin: {DEMO_ADMIN_PHONE} (first sign-in creates an
-                    admin account)
+                    Demo admin: {DEMO_ADMIN_PHONE}. Shop admin: +256788578208.
+                    Sign in with the SMS code for that number.
                   </p>
                 </div>
                 <button

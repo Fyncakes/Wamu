@@ -15,11 +15,13 @@ class ChatMediaImage extends ConsumerStatefulWidget {
     required this.imageUrl,
     this.width = 240,
     this.height = 200,
+    this.radius = 10,
   });
 
   final String? imageUrl;
   final double width;
   final double height;
+  final double radius;
 
   @override
   ConsumerState<ChatMediaImage> createState() => _ChatMediaImageState();
@@ -57,7 +59,7 @@ class _ChatMediaImageState extends ConsumerState<ChatMediaImage> {
         final auto = snap.data ?? false;
         if (_forced || auto) {
           return ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(widget.radius),
             child: CachedNetworkImage(
               imageUrl: url,
               width: widget.width,

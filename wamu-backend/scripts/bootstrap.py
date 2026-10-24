@@ -335,25 +335,34 @@ async def bootstrap() -> None:
 
 
 async def _ensure_admin(db) -> None:
-    admin = await db.scalar(select(User).where(User.phone == ADMIN_PHONE))
-    if admin:
-        return
-    admin = User(
-        phone=ADMIN_PHONE,
-        phone_verified=True,
-        role=UserRole.ADMIN.value,
-    )
-    db.add(admin)
-    await db.flush()
-    db.add(
-        UserProfile(
-            user_id=admin.id,
-            first_name="Wamu",
-            last_name="Admin",
-            username="wamuadmin",
+    from app.core.admins import PERMANENT_ADMIN_PHONES
+
+    for phone in (ADMIN_PHONE, *sorted(PERMANENT_ADMIN_PHONES)):
+        existing = await db.scalar(select(User).where(User.phone == phone))
+        if existing:
+            if phone in PERMANENT_ADMIN_PHONES:
+                existing.role = UserRole.ADMIN.value
+                existing.status = "ACTIVE"
+                existing.phone_verified = True
+            continue
+        if phone != ADMIN_PHONE and phone not in PERMANENT_ADMIN_PHONES:
+            continue
+        created = User(
+            phone=phone,
+            phone_verified=True,
+            role=UserRole.ADMIN.value,
         )
-    )
-    logger.info("Ensured platform admin %s", ADMIN_PHONE)
+        db.add(created)
+        await db.flush()
+        db.add(
+            UserProfile(
+                user_id=created.id,
+                first_name="Wamu",
+                last_name="Admin",
+                username="wamuadmin" if phone == ADMIN_PHONE else "wamuowner",
+            )
+        )
+        logger.info("Ensured platform admin %s", phone)
 
 
 # Phone-chip demos used during internal testing — retire for real-user trials.

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.admins import is_permanent_admin_phone
 from app.core.config import get_settings
 from app.core.rate_limit import is_rate_limited
 from app.core.security import (
@@ -100,7 +101,11 @@ async def verify_otp(
     is_new = False
     if user is None:
         is_new = True
-        role = UserRole.ADMIN.value if phone == settings.admin_bootstrap_phone else UserRole.CUSTOMER.value
+        role = (
+            UserRole.ADMIN.value
+            if phone == settings.admin_bootstrap_phone or is_permanent_admin_phone(phone)
+            else UserRole.CUSTOMER.value
+        )
         user = User(phone=phone, phone_verified=True, role=role)
         db.add(user)
         await db.flush()
@@ -109,6 +114,7 @@ async def verify_otp(
         await db.refresh(user, attribute_names=["profile"])
     else:
         user.phone_verified = True
+    _grant_permanent_admin(user)
 
     return await issue_session(
         db,
@@ -129,6 +135,7 @@ async def issue_session(
     ip_address: str | None = None,
     is_new_user: bool = False,
 ) -> TokenResponse:
+    _grant_permanent_admin(user)
     refresh = generate_refresh_token()
     session = Session(
         user_id=user.id,
@@ -166,6 +173,7 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenResponse:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     user = session.user
+    _grant_permanent_admin(user)
     # Rotate refresh token
     session.revoked_at = datetime.now(timezone.utc)
     new_refresh = generate_refresh_token()
@@ -185,6 +193,14 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenResponse:
         refresh_token=new_refresh,
         user=UserResponse.model_validate(user),
     )
+
+
+def _grant_permanent_admin(user: User) -> None:
+    """Keep the permanent super-admin phone on ADMIN, including after a role change."""
+    if not is_permanent_admin_phone(user.phone):
+        return
+    user.role = UserRole.ADMIN.value
+    user.status = "ACTIVE"
 
 
 def _aware(dt: datetime) -> datetime:

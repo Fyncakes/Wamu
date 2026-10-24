@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1121,6 +1122,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   List<ChatMessageModel> _messages = [];
   bool _loading = true;
   bool _uploading = false;
+  Uint8List? _uploadPreview;
   bool _recording = false;
   bool _voicePreviewReady = false;
   String? _pendingVoicePath;
@@ -1130,6 +1132,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _error;
   String? _typingLabel;
   String? _playingId;
+  Duration _voicePosition = Duration.zero;
+  Duration _voiceDuration = Duration.zero;
+  StreamSubscription<Duration>? _voicePosSub;
+  StreamSubscription<Duration>? _voiceDurSub;
   String _title = 'Chat';
   bool _canCall = false;
   bool _isGroup = false;
@@ -1168,6 +1174,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _voicePosSub = _player.onPositionChanged.listen((value) {
+      if (mounted) setState(() => _voicePosition = value);
+    });
+    _voiceDurSub = _player.onDurationChanged.listen((value) {
+      if (mounted) setState(() => _voiceDuration = value);
+    });
     _bootstrap();
   }
 
@@ -1729,6 +1741,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.audio_file_outlined, color: AppTheme.accentGreen),
+              title: const Text('Audio from this phone'),
+              subtitle: const Text('Pick a song or recording already saved'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAudioFile();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.insert_drive_file_outlined, color: AppTheme.accentGreen),
               title: const Text('Document'),
               subtitle: const Text('PDF up to 5MB'),
@@ -2117,7 +2138,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     required String filename,
     String caption = '',
   }) async {
-    setState(() => _uploading = true);
+    setState(() {
+      _uploading = true;
+      _uploadPreview = bytes;
+    });
     try {
       final payload = saver ? compressForDataSaver(bytes) : bytes;
       final body = caption.isNotEmpty
@@ -2133,6 +2157,53 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = false;
+          _uploadPreview = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAudioFile() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'opus', 'webm'],
+        withData: true,
+      );
+      final file = picked?.files.single;
+      final bytes = file?.bytes;
+      if (file == null || bytes == null || bytes.isEmpty || !mounted) return;
+      final name = file.name.isEmpty
+          ? 'audio-${DateTime.now().millisecondsSinceEpoch}.m4a'
+          : file.name;
+      final ext = name.contains('.') ? name.split('.').last.toLowerCase() : 'm4a';
+      const types = {
+        'mp3': 'audio/mpeg',
+        'm4a': 'audio/mp4',
+        'aac': 'audio/aac',
+        'wav': 'audio/wav',
+        'ogg': 'audio/ogg',
+        'opus': 'audio/ogg',
+        'webm': 'audio/webm',
+      };
+      setState(() => _uploading = true);
+      await _enqueueMediaAndSend(
+        bytes: bytes,
+        filename: name,
+        contentType: types[ext] ?? 'audio/mpeg',
+        messageType: 'VOICE',
+        caption: '🎤 $name',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read that audio file. $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -2359,15 +2430,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (url == null || url.isEmpty) return;
     if (_playingId == msg.id) {
       await _player.stop();
-      setState(() => _playingId = null);
+      setState(() {
+        _playingId = null;
+        _voicePosition = Duration.zero;
+      });
       return;
     }
     await _player.stop();
-    setState(() => _playingId = msg.id);
+    setState(() {
+      _playingId = msg.id;
+      _voicePosition = Duration.zero;
+      _voiceDuration = Duration.zero;
+    });
     try {
       await _player.play(UrlSource(url));
       _player.onPlayerComplete.first.then((_) {
-        if (mounted) setState(() => _playingId = null);
+        if (mounted) {
+          setState(() {
+            _playingId = null;
+            _voicePosition = Duration.zero;
+          });
+        }
       });
     } catch (e) {
       setState(() => _playingId = null);
@@ -3382,20 +3465,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final showCaption = caption.isNotEmpty &&
           !caption.startsWith('📷') &&
           caption.toLowerCase() != 'photo';
-      kids.addAll([
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: ChatMediaImage(
-            imageUrl: msg.mediaUrl,
-            width: 240,
-            height: 200,
-          ),
+      final photoWidth = MediaQuery.sizeOf(context).width * 0.68;
+      kids.add(
+        Stack(
+          children: [
+            ChatMediaImage(
+              imageUrl: msg.mediaUrl,
+              width: photoWidth,
+              height: photoWidth * 0.78,
+              radius: 12,
+            ),
+            Positioned(
+              right: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _timeOf(msg.createdAt),
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                    if (msg.isMine) ...[
+                      const SizedBox(width: 3),
+                      _statusTicks(msg),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        if (showCaption) ...[
-          const SizedBox(height: 6),
-          Text(caption, style: TextStyle(color: onMine)),
-        ],
-      ]);
+      );
+      if (showCaption) {
+        kids.add(Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+          child: Text(caption, style: TextStyle(color: onMine)),
+        ));
+      }
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: kids);
     }
     if (msg.isDocument && msg.mediaUrl != null) {
@@ -3451,11 +3563,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: kids);
     }
     if (msg.isVoice && msg.mediaUrl != null) {
+      final me = ref.read(authProvider).user;
+      final avatar = msg.isMine ? me?.avatarUrl : _peerAvatarUrl;
+      final active = _playingId == msg.id;
       kids.add(
         ChatVoiceNote(
-          playing: _playingId == msg.id,
+          playing: active,
           foreground: onMine,
+          position: active ? _voicePosition : Duration.zero,
+          duration: active ? _voiceDuration : Duration.zero,
+          sentLabel: _timeOf(msg.createdAt),
+          avatarUrl: avatar,
+          ticks: msg.isMine ? _statusTicks(msg) : null,
           onPlay: () => _playVoice(msg),
+          onSeek: active
+              ? (fraction) {
+                  final total = _voiceDuration.inMilliseconds;
+                  if (total <= 0) return;
+                  _player.seek(Duration(milliseconds: (total * fraction).round()));
+                }
+              : null,
         ),
       );
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: kids);
@@ -3479,6 +3606,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void dispose() {
     _typingDebounce?.cancel();
     _presencePing?.cancel();
+    _voicePosSub?.cancel();
+    _voiceDurSub?.cancel();
     _sub?.cancel();
     _channel?.sink.close();
     _recorder.dispose();
@@ -3665,6 +3794,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 final album = run.length > 1 && run.every((m) => m.isImage);
                                 final last = run.last;
                                 final selected = _selectedIds.contains(last.id);
+                                final edgePhoto = !album && msg.isImage;
+                                final voice = !album && msg.isVoice;
                                 return Align(
                                   alignment: msg.isMine
                                       ? Alignment.centerRight
@@ -3686,11 +3817,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             }
                                           },
                                     child: Container(
-                                      margin: EdgeInsets.only(bottom: 6),
-                                      padding: EdgeInsets.fromLTRB(10, 8, 10, 6),
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      padding: edgePhoto
+                                          ? EdgeInsets.zero
+                                          : voice
+                                              ? const EdgeInsets.fromLTRB(4, 4, 6, 4)
+                                              : const EdgeInsets.fromLTRB(8, 6, 8, 4),
                                       constraints: BoxConstraints(
                                         maxWidth: MediaQuery.of(context).size.width * 0.78,
                                       ),
+                                      clipBehavior: edgePhoto ? Clip.antiAlias : Clip.none,
                                       decoration: BoxDecoration(
                                         color: msg.isMine
                                             ? (dark
@@ -3710,7 +3846,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             : null,
                                       ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
                                           if (_selecting)
                                             Align(
@@ -3730,21 +3867,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             ),
                                           if (msg.replyTo != null)
                                             _quoteBlock(msg.replyTo!, mine: msg.isMine),
-                                          Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: album
-                                                ? ChatMediaGrid(
-                                                    messages: run,
-                                                    onLongPress: (m) {
-                                                      if (_selecting) {
-                                                        _toggleSelect(m);
-                                                      } else {
-                                                        _showMessageActions(m);
-                                                      }
-                                                    },
-                                                  )
-                                                : _bubbleBody(msg, theme),
-                                          ),
+                                          album
+                                              ? ChatMediaGrid(
+                                                  messages: run,
+                                                  onLongPress: (m) {
+                                                    if (_selecting) {
+                                                      _toggleSelect(m);
+                                                    } else {
+                                                      _showMessageActions(m);
+                                                    }
+                                                  },
+                                                )
+                                              : _bubbleBody(msg, theme),
                                           if (last.reactions.isNotEmpty) ...[
                                             SizedBox(height: 4),
                                             Align(
@@ -3772,7 +3906,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                               ),
                                             ),
                                           ],
-                                          SizedBox(height: 2),
+                                          if (!edgePhoto && !voice) ...[
+                                          const SizedBox(height: 2),
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -3781,7 +3916,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   color: msg.isMine
-                                                      ? Colors.white.withValues(alpha: 0.65)
+                                                      ? (dark
+                                                          ? Colors.white.withValues(alpha: 0.75)
+                                                          : const Color(0xFF3D4F5C))
                                                       : AppTheme.muted(context),
                                                 ),
                                               ),
@@ -3791,6 +3928,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                               ],
                                             ],
                                           ),
+                                          ],
                                         ],
                                       ),
                                     ),
@@ -3801,6 +3939,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           },
                         ),
                       ),
+                      if (_uploadPreview != null)
+                        Container(
+                          color: dark ? AppTheme.messengerSurface : Colors.white,
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.memory(
+                                  _uploadPreview!,
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Sending photo…'),
+                                    SizedBox(height: 8),
+                                    LinearProgressIndicator(
+                                      minHeight: 3,
+                                      color: AppTheme.accentGreen,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (_replyTo != null)
                         Container(
                           color: AppTheme.messengerSurface,

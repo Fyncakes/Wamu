@@ -137,6 +137,26 @@ async def _repair_shop_logos(db: AsyncSession, businesses: list[Business]) -> No
         await db.flush()
 
 
+async def list_workplace_businesses(db: AsyncSession, user: User) -> list[Business]:
+    """Shops the user owns or works in, so staff can publish the shop's videos."""
+    member_ids = select(BusinessMember.business_id).where(
+        BusinessMember.user_id == user.id,
+        BusinessMember.is_active.is_(True),
+    )
+    result = await db.execute(
+        select(Business)
+        .options(selectinload(Business.location))
+        .where(
+            Business.deleted_at.is_(None),
+            or_(Business.owner_id == user.id, Business.id.in_(member_ids)),
+        )
+        .order_by(Business.created_at.desc())
+    )
+    rows = list(result.unique().scalars().all())
+    await _repair_shop_logos(db, rows)
+    return rows
+
+
 async def list_owned_businesses(db: AsyncSession, user: User) -> list[Business]:
     result = await db.execute(
         select(Business)

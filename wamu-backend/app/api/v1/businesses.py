@@ -63,6 +63,15 @@ async def my_businesses(
     return await business_service.list_owned_businesses(db, user)
 
 
+@router.get("/workplace", response_model=list[BusinessResponse])
+async def workplace_businesses(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Shops this person owns or is employed by. Used for short-video publishing."""
+    return await business_service.list_workplace_businesses(db, user)
+
+
 @router.post("", response_model=BusinessResponse, status_code=201)
 async def create_business(
     body: BusinessCreate,

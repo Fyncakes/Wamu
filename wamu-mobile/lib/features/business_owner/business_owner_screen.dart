@@ -37,6 +37,7 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
   String? _verification;
   String? _bizName;
   String? _bizId;
+  bool _staffShop = false;
   bool _loading = true;
   Timer? _statusPoll;
 
@@ -58,12 +59,19 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
 
   Future<void> _loadMine({bool silent = false}) async {
     try {
-      final response = await ref.read(apiClientProvider).get('/businesses/mine');
-      final list = (response.data as List).cast<Map<String, dynamic>>();
+      var response = await ref.read(apiClientProvider).get('/businesses/mine');
+      var list = (response.data as List).cast<Map<String, dynamic>>();
+      var staffShop = false;
+      if (list.isEmpty) {
+        response = await ref.read(apiClientProvider).get('/businesses/workplace');
+        list = (response.data as List).cast<Map<String, dynamic>>();
+        staffShop = list.isNotEmpty;
+      }
       if (list.isNotEmpty) {
         _bizId = list.first['id']?.toString();
         _bizName = list.first['name']?.toString();
         _verification = list.first['verification_status']?.toString();
+        _staffShop = staffShop;
       }
     } catch (_) {
       // Hub still usable without banner.
@@ -87,7 +95,9 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'List products, chat with customers, and fulfill orders.',
+            _staffShop
+                ? 'You can record and publish short videos for this shop.'
+                : 'List products, chat with customers, and fulfill orders.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           if (!_loading && pending) ...[
@@ -122,6 +132,14 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
             ),
           ],
           const SizedBox(height: 24),
+          if (_staffShop)
+            _OwnerTile(
+              icon: Icons.videocam_outlined,
+              title: 'Shop videos',
+              subtitle: 'Record, upload, and manage shorts for ${_bizName ?? 'this shop'}',
+              onTap: () => context.push('/business-owner/videos'),
+            ),
+          if (!_staffShop) ...[
           _OwnerTile(
             icon: Icons.insights_outlined,
             title: 'Dashboard',
@@ -218,6 +236,7 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
             subtitle: 'MoMo / Airtel number for order disbursements',
             onTap: () => context.push('/business-owner/payouts'),
           ),
+          ],
         ],
       ),
     );

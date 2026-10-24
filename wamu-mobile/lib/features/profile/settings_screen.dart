@@ -276,12 +276,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             title: 'Merchant',
                             subtitle: user?.isBusinessOwner == true
                                 ? 'Your shop'
-                                : 'Start selling',
-                            onTap: () => context.push(
-                              user?.isBusinessOwner == true
-                                  ? '/business-owner'
-                                  : '/business-owner/create',
-                            ),
+                                : 'Shop videos and selling',
+                            onTap: () => context.push('/business-owner'),
                           ),
                         ),
                         Expanded(

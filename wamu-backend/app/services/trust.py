@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.admins import is_permanent_admin_phone
 from app.models.audit import AuditLog
 from app.models.block import UserBlock
 from app.models.user import User, UserStatus
@@ -96,6 +97,8 @@ async def admin_set_user_status(
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot change your own status")
+    if is_permanent_admin_phone(user.phone) and status != UserStatus.ACTIVE.value:
+        raise HTTPException(status_code=400, detail="This admin account cannot be suspended")
     user.status = status
     db.add(
         AuditLog(

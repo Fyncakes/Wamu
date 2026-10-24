@@ -71,7 +71,7 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
       _error = null;
     });
     try {
-      final response = await ref.read(apiClientProvider).get('/businesses/mine');
+      final response = await ref.read(apiClientProvider).get('/businesses/workplace');
       final list = (response.data as List).cast<Map<String, dynamic>>();
       if (list.isNotEmpty) {
         _businessId = list.first['id']?.toString();
@@ -106,9 +106,9 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
     }
   }
 
-  Future<void> _pickAndUpload() async {
+  Future<void> _pickAndUpload({ImageSource source = ImageSource.gallery}) async {
     final file = await ImagePicker().pickVideo(
-      source: ImageSource.gallery,
+      source: source,
       maxDuration: const Duration(seconds: _kMaxShortSeconds),
     );
     if (file == null) return;
@@ -399,9 +399,15 @@ class _ManageVideosScreenState extends ConsumerState<ManageVideosScreen>
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: _busy ? null : _pickAndUpload,
+          onPressed: _busy ? null : () => _pickAndUpload(),
           icon: const Icon(Icons.video_library_outlined),
           label: const Text('Upload from gallery (max 1.5 min)'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _pickAndUpload(source: ImageSource.camera),
+          icon: const Icon(Icons.videocam_outlined),
+          label: const Text('Record a short video (max 1.5 min)'),
         ),
         const SizedBox(height: 16),
         FilledButton(

