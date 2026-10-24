@@ -217,7 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   SizedBox(height: 18),
                   Text(
-                    'We will text a 6-digit code to this number.',
+                    'For this trial, the code is 123456.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: dark ? AppTheme.muted(context) : AppTheme.warmBrown,
                     ),

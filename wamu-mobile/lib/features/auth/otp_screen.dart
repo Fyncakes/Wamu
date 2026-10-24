@@ -106,7 +106,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             ),
             SizedBox(height: 12),
             Text(
-              'Check the SMS on your phone. Delivery can take up to a minute on MTN or Airtel.',
+              'For this trial, enter 123456.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.muted(context),
                   ),
