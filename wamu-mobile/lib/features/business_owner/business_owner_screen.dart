@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/media_url.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/business_model.dart';
@@ -605,7 +606,8 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                               : (existingImageUrl != null &&
                                       existingImageUrl.isNotEmpty)
                                   ? Image.network(
-                                      existingImageUrl,
+                                      resolveMediaUrl(existingImageUrl) ??
+                                          existingImageUrl,
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => const Center(
                                         child: Icon(Icons.cake_outlined, size: 40),

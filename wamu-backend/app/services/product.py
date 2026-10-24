@@ -238,9 +238,41 @@ async def update_product(
     return await get_product(db, product_id)
 
 
+def newest_servable_image(images):
+    """The photo the shop should show. A later upload replaces the earlier one."""
+    from app.core.media_root import servable_media_url
+
+    live = [img for img in images if servable_media_url(getattr(img, "url", None))]
+    if not live:
+        return None
+
+    def recency(img) -> tuple:
+        created = getattr(img, "created_at", None)
+        stamp = created.timestamp() if created is not None else 0
+        return (stamp, getattr(img, "sort_order", 0) or 0)
+
+    return max(live, key=recency)
+
+
+def _discard_replaced_files(urls: list[str], *, keep: str) -> None:
+    from app.core.media_root import media_file_from_url
+
+    for old in urls:
+        if not old or old == keep:
+            continue
+        path = media_file_from_url(old)
+        if path is None:
+            continue
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 async def add_product_image(
     db: AsyncSession, user: User, product_id: uuid.UUID, url: str, object_key: str | None
 ) -> Product:
+    """Store the new photo as the only product image. The edit screen replaces."""
     product = await get_product(db, product_id)
     await assert_business_member(
         db,
@@ -248,16 +280,22 @@ async def add_product_image(
         product.business_id,
         {MemberRole.OWNER.value, MemberRole.MANAGER.value, MemberRole.STAFF.value},
     )
+    previous = list(product.images)
     db.add(
         ProductImage(
             product_id=product.id,
             url=url,
             object_key=object_key,
-            is_primary=len(product.images) == 0,
-            sort_order=len(product.images),
+            is_primary=True,
+            sort_order=0,
         )
     )
+    for image in previous:
+        image.is_primary = False
+        await db.delete(image)
     await db.flush()
+    _discard_replaced_files([img.url for img in previous], keep=url)
+    db.expire(product, ["images"])
     return await get_product(db, product_id)
 
 

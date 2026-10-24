@@ -7,7 +7,6 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.integrations.storage import s3
 from app.models.user import User
-from app.core.media_root import servable_media_url
 from app.schemas.marketplace import ProductCreate, ProductResponse, ProductUpdate
 from app.services import product as product_service
 
@@ -15,10 +14,16 @@ router = APIRouter()
 
 
 def _public_product(product) -> ProductResponse:
-    """Hide image rows whose file is gone so the app shows a placeholder."""
+    """Show the latest photo whose file is still on disk."""
     body = ProductResponse.model_validate(product)
+    chosen = product_service.newest_servable_image(product.images)
+    if chosen is None:
+        body.images = []
+        return body
     body.images = [
-        img for img in body.images if servable_media_url(img.url) is not None
+        next(img for img in body.images if img.id == chosen.id).model_copy(
+            update={"is_primary": True, "sort_order": 0}
+        )
     ]
     return body
 
