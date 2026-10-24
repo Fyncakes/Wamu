@@ -82,7 +82,7 @@ class _BusinessOwnerScreenState extends ConsumerState<BusinessOwnerScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            _bizName == null ? 'Manage your WAMU storefront' : _bizName!,
+            _bizName == null ? 'Manage your Wamu storefront' : _bizName!,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),

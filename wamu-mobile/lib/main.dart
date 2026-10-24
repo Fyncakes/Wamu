@@ -31,7 +31,7 @@ class WamuApp extends ConsumerWidget {
     final appearance = ref.watch(appearanceProvider);
 
     return MaterialApp.router(
-      title: 'WAMU',
+      title: 'Wamu',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.messengerLightTheme,
       darkTheme: AppTheme.messengerDarkTheme,

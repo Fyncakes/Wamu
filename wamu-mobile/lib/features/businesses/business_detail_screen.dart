@@ -147,7 +147,7 @@ class _BusinessDetailScreenState extends ConsumerState<BusinessDetailScreen> {
     try {
       final convo = await ref.read(chatRepositoryProvider).startConversation(
             widget.businessId,
-            message: 'Hi! I found you on WAMU.',
+            message: 'Hi! I found you on Wamu.',
           );
       if (mounted) context.push('/chat/${convo.id}');
     } catch (e) {
@@ -339,7 +339,7 @@ class _BusinessDetailScreenState extends ConsumerState<BusinessDetailScreen> {
                           size: 16,
                           color: Theme.of(context).colorScheme.primary,
                         ),
-                        label: const Text('Verified on WAMU'),
+                        label: const Text('Verified on Wamu'),
                       ),
                     if (business.address != null) Text(business.address!),
                     if (business.description != null) ...[

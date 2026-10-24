@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String appName = 'WAMU';
+  static const String appName = 'Wamu';
   static const String tagline = "Uganda's Digital Home";
   static const String supportLine = 'Connect. Discover. Shop. Move. Grow.';
 

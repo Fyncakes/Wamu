@@ -12,7 +12,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final user = auth.user;
-    final displayName = (user?.name.isNotEmpty == true) ? user!.name : 'WAMU User';
+    final displayName = (user?.name.isNotEmpty == true) ? user!.name : 'Wamu';
     final initial = displayName.trim().isNotEmpty ? displayName[0].toUpperCase() : '?';
 
     return Scaffold(
