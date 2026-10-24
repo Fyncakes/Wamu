@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -763,21 +764,23 @@ class NewChatScreen extends ConsumerStatefulWidget {
   ConsumerState<NewChatScreen> createState() => _NewChatScreenState();
 }
 
+class _SavedContact {
+  const _SavedContact({required this.name, required this.phone});
+
+  final String name;
+  final String phone;
+}
+
 class _NewChatScreenState extends ConsumerState<NewChatScreen> {
-  final _phoneController = TextEditingController(text: '+256');
   final _searchController = TextEditingController();
   bool _loading = false;
   bool _dirLoading = true;
+  bool _permissionDenied = false;
   String? _error;
   String _query = '';
   List<Map<String, dynamic>> _people = [];
+  List<_SavedContact> _inviteContacts = [];
   int _onWamuCount = 0;
-
-  static const _inviteSuggestions = [
-    ('Mum', '+256700111222'),
-    ('Hostel mate', '+256701222333'),
-    ('Class group lead', '+256702333444'),
-  ];
 
   @override
   void initState() {
@@ -787,25 +790,90 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _loadDirectory() async {
-    setState(() => _dirLoading = true);
-    try {
-      final dir = await ref.read(chatRepositoryProvider).getDirectory();
+    setState(() {
+      _dirLoading = true;
+      _error = null;
+      _permissionDenied = false;
+    });
+    if (kIsWeb) {
       if (!mounted) return;
       setState(() {
-        _people = dir.items;
-        _onWamuCount = dir.onWamuCount;
+        _dirLoading = false;
+        _error = 'Open Wamu on your phone to use contacts saved on this device.';
+      });
+      return;
+    }
+    try {
+      final granted = await FlutterContacts.requestPermission(readonly: true);
+      if (!mounted) return;
+      if (!granted) {
+        setState(() {
+          _permissionDenied = true;
+          _people = [];
+          _inviteContacts = [];
+          _onWamuCount = 0;
+          _dirLoading = false;
+        });
+        return;
+      }
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      final saved = <String, _SavedContact>{};
+      for (final contact in contacts) {
+        final name = contact.displayName.trim().isEmpty
+            ? 'Contact'
+            : contact.displayName.trim();
+        for (final phone in contact.phones) {
+          if (!isValidUgPhone(phone.number)) continue;
+          final e164 = normalizeUgPhone(phone.number);
+          saved.putIfAbsent(e164, () => _SavedContact(name: name, phone: e164));
+        }
+      }
+      final matched = await ref
+          .read(chatRepositoryProvider)
+          .matchSavedContacts(saved.keys.toList());
+      final onWamuByPhone = <String, Map<String, dynamic>>{};
+      for (final row in matched) {
+        final raw = row['phone']?.toString() ?? '';
+        if (!isValidUgPhone(raw)) continue;
+        onWamuByPhone[normalizeUgPhone(raw)] = row;
+      }
+      final people = <Map<String, dynamic>>[];
+      final invite = <_SavedContact>[];
+      for (final contact in saved.values) {
+        final hit = onWamuByPhone[contact.phone];
+        if (hit == null) {
+          invite.add(contact);
+          continue;
+        }
+        people.add({
+          'id': hit['id'],
+          'phone': contact.phone,
+          'name': contact.name,
+          'avatar_url': hit['avatar_url'],
+        });
+      }
+      people.sort(
+        (a, b) => (a['name']?.toString() ?? '')
+            .toLowerCase()
+            .compareTo((b['name']?.toString() ?? '').toLowerCase()),
+      );
+      invite.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      if (!mounted) return;
+      setState(() {
+        _people = people;
+        _inviteContacts = invite;
+        _onWamuCount = people.length;
         _dirLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = apiErrorMessage(e);
         _dirLoading = false;
       });
     }
@@ -828,27 +896,6 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _lookupAndStart() async {
-    final phone = normalizeUgPhone(_phoneController.text);
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final found = await ref.read(chatRepositoryProvider).lookupByPhone(phone);
-      if (found == null) {
-        if (!mounted) return;
-        setState(() => _loading = false);
-        await _invite(phone);
-        return;
-      }
-      await _start(userId: found['id']?.toString(), phone: phone);
-    } catch (e) {
-      setState(() => _error = '$e');
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -920,11 +967,17 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
   List<Map<String, dynamic>> get _filtered {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return _people;
-    return _people.where((p) {
-      final name = (p['name']?.toString() ?? '').toLowerCase();
-      final phone = (p['phone']?.toString() ?? '').toLowerCase();
-      return name.contains(q) || phone.contains(q);
-    }).toList();
+    return _people.where((p) => _contactMatches(p['name']?.toString(), p['phone']?.toString(), q)).toList();
+  }
+
+  List<_SavedContact> get _filteredInvite {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return _inviteContacts;
+    return _inviteContacts.where((c) => _contactMatches(c.name, c.phone, q)).toList();
+  }
+
+  bool _contactMatches(String? name, String? phone, String q) {
+    return (name ?? '').toLowerCase().contains(q) || (phone ?? '').toLowerCase().contains(q);
   }
 
   @override
@@ -937,47 +990,31 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
           children: [
             const Text('Select contact'),
             Text(
-              '$_onWamuCount people on Wamu',
+              _permissionDenied
+                  ? 'Contacts permission is off'
+                  : '$_onWamuCount saved contacts on Wamu',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: 'Invite a friend',
-            onPressed: _loading
-                ? null
-                : () {
-                    final phone = normalizeUgPhone(_phoneController.text);
-                    if (phone.length < 12) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Enter a +256 number above, then Invite'),
-                        ),
-                      );
-                      return;
-                    }
-                    _invite(phone);
-                  },
-            icon: Icon(Icons.person_add_alt_1_outlined),
-          ),
-          IconButton(
             tooltip: 'Refresh',
             onPressed: _dirLoading ? null : _loadDirectory,
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: _dirLoading
-          ? LoadingView()
+          ? const LoadingView()
           : ListView(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 Text(
-                  'Pick someone below, or invite a +256 number that isn’t here yet.',
+                  'Only numbers saved on this phone are shown. Someone appears here when that saved number is also on Wamu.',
                   style: theme.textTheme.bodyMedium,
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _searchController,
                   onChanged: (v) => setState(() => _query = v),
@@ -986,41 +1023,18 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                     prefixIcon: Icon(Icons.search, color: AppTheme.muted(context)),
                   ),
                 ),
-                SizedBox(height: 16),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'Phone not in list',
-                    hintText: '+2567…',
+                if (_permissionDenied) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Allow contacts for Wamu in your phone settings, then tap refresh.',
+                    style: TextStyle(color: AppTheme.muted(context)),
                   ),
-                ),
+                ],
                 if (_error != null) ...[
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
                 ],
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _loading ? null : _lookupAndStart,
-                        icon: _loading
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.black,
-                                ),
-                              )
-                            : Icon(Icons.chat_bubble_outline, size: 18),
-                        label: Text(_loading ? 'Working…' : 'Chat / Invite'),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 Row(
                   children: [
                     Text('On Wamu', style: theme.textTheme.titleMedium),
@@ -1081,23 +1095,32 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                 Text('Invite to Wamu', style: theme.textTheme.titleMedium),
                 SizedBox(height: 4),
                 Text(
-                  'Friends who may not have signed up yet',
+                  'Saved on this phone, not on Wamu yet',
                   style: TextStyle(color: AppTheme.muted(context), fontSize: 13),
                 ),
                 const SizedBox(height: 8),
-                ..._inviteSuggestions.map(
-                  (c) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ContactAvatar(name: c.$1, phone: c.$2),
-                    title: Text(c.$1),
-                    subtitle: Text(c.$2),
-                    trailing: TextButton.icon(
-                      onPressed: _loading ? null : () => _invite(c.$2),
-                      icon: const Icon(Icons.sms_outlined, size: 16),
-                      label: const Text('Invite'),
+                if (_filteredInvite.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No other saved Uganda numbers.',
+                      style: TextStyle(color: AppTheme.muted(context)),
+                    ),
+                  )
+                else
+                  ..._filteredInvite.map(
+                    (c) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: ContactAvatar(name: c.name, phone: c.phone),
+                      title: Text(c.name),
+                      subtitle: Text(c.phone),
+                      trailing: TextButton.icon(
+                        onPressed: _loading ? null : () => _invite(c.phone),
+                        icon: const Icon(Icons.sms_outlined, size: 16),
+                        label: const Text('Invite'),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
     );

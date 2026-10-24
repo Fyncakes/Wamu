@@ -1,7 +1,7 @@
 name: wamu_mobile
 description: WAMU Uganda Super App — Connect. Discover. Do More.
 publish_to: 'none'
-version: 1.0.1+2102
+version: 1.0.1+2103
 
 environment:
   sdk: ^3.13.3
@@ -39,6 +39,7 @@ dependencies:
   mobile_scanner: ^7.4.2
   video_player: ^2.10.0
   file_picker: ^8.3.7
+  flutter_contacts: ^1.1.9+2
   geolocator: ^14.0.2
   flutter_map: ^8.3.2
   latlong2: ^0.10.1

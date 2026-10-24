@@ -152,6 +152,27 @@ class ChatRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> matchSavedContacts(List<String> phones) async {
+    if (phones.isEmpty) return [];
+    final matched = <Map<String, dynamic>>[];
+    const chunkSize = 400;
+    for (var i = 0; i < phones.length; i += chunkSize) {
+      final end = i + chunkSize > phones.length ? phones.length : i + chunkSize;
+      final response = await _client.post('/chat/contacts/match', data: {
+        'phones': phones.sublist(i, end),
+      });
+      final data = response.data;
+      if (data is Map && data['items'] is List) {
+        matched.addAll(
+          (data['items'] as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)),
+        );
+      }
+    }
+    return matched;
+  }
+
   Future<({List<Map<String, dynamic>> items, int onWamuCount})> getDirectory() async {
     final response = await _client.get('/chat/directory');
     final data = response.data;

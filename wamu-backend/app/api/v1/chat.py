@@ -7,7 +7,7 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, get_db
@@ -190,9 +190,13 @@ async def rename_conversation(
     return ConversationResponse.model_validate(row)
 
 
+class ContactMatchBody(BaseModel):
+    phones: list[str] = Field(default_factory=list, max_length=500)
+
+
 @router.get("/users/lookup")
 async def lookup_user(
-    phone: str = Query(..., min_length=10, max_length=20),
+    phone: str = Query(..., min_length=9, max_length=20),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -209,8 +213,17 @@ async def contact_directory(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """People on Wamu for the contact picker (Sprint 3)."""
+    """Empty on purpose. New chat uses numbers saved on the phone."""
     return await chat_service.list_directory(db, user)
+
+
+@router.post("/contacts/match")
+async def match_saved_contacts(
+    body: ContactMatchBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await chat_service.match_saved_contacts(db, user, body.phones)
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageResponse])

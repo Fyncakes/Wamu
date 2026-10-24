@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.phones import normalize_ug_phone
 from app.models.user import User
 from app.services import dashboards as dash
 
@@ -22,7 +23,7 @@ class BusinessSettingsUpdate(BaseModel):
 
 
 class StaffAdd(BaseModel):
-    phone: str = Field(min_length=10, max_length=20)
+    phone: str = Field(min_length=9, max_length=20)
     role: str = Field(default="STAFF", max_length=20)
 
 
@@ -80,7 +81,10 @@ async def biz_add_staff(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await dash.add_business_staff(db, user, body.phone, body.role)
+    phone = normalize_ug_phone(body.phone)
+    if phone is None:
+        raise HTTPException(status_code=400, detail="Enter a Uganda number like 07… or +256…")
+    return await dash.add_business_staff(db, user, phone, body.role)
 
 
 @router.patch("/business/settings")

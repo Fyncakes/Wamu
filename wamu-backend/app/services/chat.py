@@ -912,8 +912,13 @@ async def soft_delete_messages(
 
 
 async def lookup_user_by_phone(db: AsyncSession, phone: str) -> dict | None:
+    from app.core.phones import normalize_ug_phone
+
+    normalized = normalize_ug_phone(phone)
+    if normalized is None:
+        return None
     user = await db.scalar(
-        select(User).options(selectinload(User.profile)).where(User.phone == phone)
+        select(User).options(selectinload(User.profile)).where(User.phone == normalized)
     )
     if not user:
         return None
@@ -927,15 +932,34 @@ async def lookup_user_by_phone(db: AsyncSession, phone: str) -> dict | None:
 
 
 async def list_directory(db: AsyncSession, user: User, limit: int = 40) -> dict:
-    """Directory of other Wamu users for contact picker."""
+    """Older apps called this for every Wamu account. That list stays empty."""
+    del db, user, limit
+    return {
+        "items": [],
+        "on_wamu_count": 0,
+        "note": "Only contacts saved on the phone can be shown",
+    }
+
+
+async def match_saved_contacts(db: AsyncSession, user: User, phones: list[str]) -> dict:
+    """Return Wamu accounts whose numbers are in this phone's saved contacts."""
+    from app.core.phones import normalize_ug_phone
     from app.services.trust import is_blocked_either_way
 
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for raw in phones[:500]:
+        phone = normalize_ug_phone(raw)
+        if not phone or phone == user.phone or phone in seen:
+            continue
+        seen.add(phone)
+        wanted.append(phone)
+    if not wanted:
+        return {"items": []}
     result = await db.execute(
         select(User)
         .options(selectinload(User.profile))
-        .where(User.id != user.id, User.status == "ACTIVE")
-        .order_by(User.created_at.desc())
-        .limit(min(limit, 100))
+        .where(User.phone.in_(wanted), User.status == "ACTIVE", User.id != user.id)
     )
     people = []
     for peer in result.scalars().all():
@@ -951,11 +975,7 @@ async def list_directory(db: AsyncSession, user: User, limit: int = 40) -> dict:
                 "on_wamu": True,
             }
         )
-    return {
-        "items": people,
-        "on_wamu_count": len(people),
-        "note": "Invite friends who are not on Wamu yet",
-    }
+    return {"items": people}
 
 
 async def _conversation_row(db: AsyncSession, user: User, convo: Conversation) -> dict:

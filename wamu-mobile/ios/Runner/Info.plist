@@ -53,6 +53,8 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Wamu shows people you already saved on this phone so you can message them.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Wamu uses your location to show nearby Kampala shops for delivery.</string>
 	<key>NSAppleMusicUsageDescription</key>

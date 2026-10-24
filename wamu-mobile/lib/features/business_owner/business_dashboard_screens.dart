@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_error.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/utils/phone_normalize.dart';
 import '../../shared/utils/ugx_formatter.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
@@ -247,18 +248,28 @@ class _BusinessStaffScreenState extends ConsumerState<BusinessStaffScreen> {
   }
 
   Future<void> _add() async {
-    final phone = _phone.text.trim();
-    if (phone.isEmpty) return;
+    final raw = _phone.text.trim();
+    if (raw.isEmpty) return;
+    late final String phone;
+    try {
+      phone = normalizeUgPhone(raw);
+    } on FormatException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a Uganda number like 07… or +256…')),
+      );
+      return;
+    }
     try {
       await ref.read(apiClientProvider).post('/dashboard/business/staff', data: {
-        'phone': phone.startsWith('+') ? phone : '+256${phone.replaceAll(RegExp(r'^0'), '')}',
+        'phone': phone,
         'role': 'STAFF',
       });
       _phone.clear();
       setState(() => _future = _load());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
     }
   }
 
