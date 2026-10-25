@@ -18,7 +18,7 @@ from app.core.config import get_settings
 from app.core.logging import new_request_id, request_id_ctx, setup_logging
 from app.core.media_root import media_root
 from app.core.media_urls import public_origin, rewrite_media_tree
-from app.core.rate_limit import is_rate_limited
+from app.core.rate_limit import client_ip, is_rate_limited
 
 settings = get_settings()
 _MEDIA_ROOT = media_root()
@@ -44,11 +44,15 @@ async def lifespan(_app: FastAPI):
     await realtime_manager.stop()
 
 
+_public_docs = settings.is_development
 app = FastAPI(
     title="WAMU API",
     description="Uganda Super App — Connect. Discover. Do More.",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url="/docs" if _public_docs else None,
+    redoc_url="/redoc" if _public_docs else None,
+    openapi_url="/openapi.json" if _public_docs else None,
 )
 
 # Local demo media (when MinIO is not running)
@@ -109,6 +113,17 @@ async def static_cache_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
     from app.core.metrics import HTTP_REQUESTS, metrics
 
@@ -137,7 +152,7 @@ async def rate_limit_middleware(request: Request, call_next):
         limit = settings.rate_limit_api_per_minute
         if settings.debug or settings.otp_mock_mode or settings.environment == "development":
             limit = max(limit, 600)
-        ip = request.client.host if request.client else "unknown"
+        ip = client_ip(request)
         if await is_rate_limited(f"api:{ip}", limit, 60):
             return JSONResponse({"detail": "Rate limit exceeded"}, status_code=429)
     return await call_next(request)

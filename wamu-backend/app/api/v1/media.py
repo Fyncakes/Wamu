@@ -18,6 +18,18 @@ _VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/3gpp", "vid
 _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".m4v", ".3gp", ".mkv")
 
 
+def _sniff_image(data: bytes) -> str | None:
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 def _looks_like_video(data: bytes) -> bool:
     """ISO BMFF (mp4/mov) or WebM, even when the phone omits the filename extension."""
     if len(data) >= 12 and data[4:8] == b"ftyp":
@@ -65,7 +77,17 @@ async def upload(
             name,
         )
         raise HTTPException(status_code=400, detail="Unsupported file type")
-    if name.endswith(".pdf") and not content_type.startswith("application/pdf"):
+    head = data[:64].lower()
+    if b"<svg" in head or b"<html" in head or b"<!doctype" in head or name.endswith((".svg", ".html", ".htm", ".xml")):
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    if content_type.startswith("image/") or name.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
+        sniffed = _sniff_image(data)
+        if sniffed is None:
+            raise HTTPException(status_code=400, detail="File is not a photo")
+        content_type = sniffed
+    if name.endswith(".pdf") or content_type == "application/pdf":
+        if not data.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="File is not a PDF")
         content_type = "application/pdf"
     if is_video and content_type not in _VIDEO_TYPES:
         if name.endswith(".mp4"):

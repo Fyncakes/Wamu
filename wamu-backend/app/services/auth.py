@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -166,10 +166,22 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenResponse:
         .options(selectinload(Session.user).selectinload(User.profile))
     )
     session = result.scalar_one_or_none()
-    expires = session.expires_at if session else None
+    if session is None:
+        # A refresh token that was already rotated means the old copy leaked.
+        stolen = await db.scalar(select(Session).where(Session.refresh_token_hash == token_hash))
+        if stolen is not None and stolen.revoked_at is not None:
+            now = datetime.now(timezone.utc)
+            await db.execute(
+                update(Session)
+                .where(Session.user_id == stolen.user_id, Session.revoked_at.is_(None))
+                .values(revoked_at=now)
+            )
+            await db.flush()
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    expires = session.expires_at
     if expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
-    if session is None or expires is None or expires < datetime.now(timezone.utc):
+    if expires is None or expires < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     user = session.user

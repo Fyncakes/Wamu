@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, get_db
+from app.core.rate_limit import is_rate_limited
 from app.core.deps import get_current_user
 from app.core.metrics import WS_CHAT_CONNECT, WS_CHAT_DISCONNECT, metrics
 from app.core.realtime import manager
@@ -200,6 +201,10 @@ async def lookup_user(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if await is_rate_limited(f"lookup:{user.id}", 20, 3600):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=429, detail="Too many lookups. Try later.")
     found = await chat_service.lookup_user_by_phone(db, phone.strip())
     if not found:
         from fastapi import HTTPException
@@ -223,6 +228,10 @@ async def match_saved_contacts(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if await is_rate_limited(f"contacts:{user.id}", 30, 3600):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=429, detail="Too many contact checks. Try later.")
     return await chat_service.match_saved_contacts(db, user, body.phones)
 
 

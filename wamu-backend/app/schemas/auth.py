@@ -52,12 +52,12 @@ class DeviceLinkStatusResponse(BaseModel):
 
 
 class UserProfileUpdate(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
-    username: str | None = None
-    bio: str | None = None
-    avatar_url: str | None = None
-    interests: str | None = None
+    first_name: str | None = Field(default=None, max_length=80)
+    last_name: str | None = Field(default=None, max_length=80)
+    username: str | None = Field(default=None, max_length=40)
+    bio: str | None = Field(default=None, max_length=500)
+    avatar_url: str | None = Field(default=None, max_length=500)
+    interests: str | None = Field(default=None, max_length=200)
     wants_to_buy: bool | None = None
     owns_business: bool | None = None
     wants_to_ride: bool | None = None

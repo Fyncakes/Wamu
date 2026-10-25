@@ -60,6 +60,24 @@ def test_normalize_airtel_success():
     assert out["provider_reference"] == "AIR-1"
 
 
+def test_public_staging_rejects_unsigned_callback_even_when_mock_payments_are_on(monkeypatch):
+    from app.core import webhook_security as wh
+
+    class _S:
+        environment = "staging"
+        is_production = False
+        payment_mock_auto_success = True
+        payment_webhook_secret = "fallback-secret"
+        mtn_webhook_secret = ""
+        airtel_webhook_secret = ""
+
+    monkeypatch.setattr(wh, "get_settings", lambda: _S())
+    body = b'{"externalId":"x","status":"SUCCESSFUL"}'
+    with pytest.raises(HTTPException) as ei:
+        verify_provider_webhook("MTN", body=body, request=_request(body, {}))
+    assert ei.value.status_code == 401
+
+
 def test_mtn_signature_required_when_mocks_off(monkeypatch):
     from app.core import webhook_security as wh
 

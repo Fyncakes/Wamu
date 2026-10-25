@@ -79,27 +79,16 @@ def verify_provider_webhook(provider: str, *, body: bytes, request: Request) -> 
     else:
         signature = _header(request, "X-Wamu-Signature")
 
-    # Sandbox / lab: MTN often sends callbacks with no signature. Only enforce HMAC
-    # when a dedicated MTN_WEBHOOK_SECRET is set (or in production).
-    allow_unsigned = (
-        not signature
-        and (
-            (
-                not settings.is_production
-                and settings.payment_mock_auto_success
-                and key in {"MOCK", "MTN", "AIRTEL"}
-            )
-            or (
-                key == "MTN"
-                and not settings.is_production
-                and not (settings.mtn_webhook_secret or "").strip()
-            )
-            or (
-                key == "AIRTEL"
-                and not settings.is_production
-                and not (settings.airtel_webhook_secret or "").strip()
-            )
+    # Unsigned callbacks are only for a laptop lab. Staging is on the public
+    # internet, so a missing signature there is rejected.
+    environment = getattr(settings, "environment", "staging")
+    allow_unsigned = not signature and environment == "development" and (
+        (
+            settings.payment_mock_auto_success
+            and key in {"MOCK", "MTN", "AIRTEL"}
         )
+        or (key == "MTN" and not (settings.mtn_webhook_secret or "").strip())
+        or (key == "AIRTEL" and not (settings.airtel_webhook_secret or "").strip())
     )
     if allow_unsigned:
         return

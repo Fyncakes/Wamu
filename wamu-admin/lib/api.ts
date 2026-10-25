@@ -78,10 +78,22 @@ async function request<T>(
     }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal ?? AbortSignal.timeout(12000),
+    });
+  } catch (err) {
+    const timedOut = err instanceof DOMException && err.name === "TimeoutError";
+    throw new ApiError(
+      timedOut
+        ? "The server took too long to answer. Try again."
+        : "Unable to reach the server. Check your connection.",
+      0,
+    );
+  }
 
   if (response.status === 401 && authenticated) {
     clearToken();

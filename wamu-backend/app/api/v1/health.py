@@ -41,10 +41,10 @@ async def health_database():
             "status": "ok",
             "latency_ms": round((time.perf_counter() - t0) * 1000, 2),
         }
-    except Exception as exc:
+    except Exception:
         return {
             "status": "error",
-            "detail": str(exc),
+            "detail": "database unavailable",
             "latency_ms": round((time.perf_counter() - t0) * 1000, 2),
         }
 
@@ -65,10 +65,10 @@ async def health_redis():
             "status": "ok",
             "latency_ms": round((time.perf_counter() - t0) * 1000, 2),
         }
-    except Exception as exc:
+    except Exception:
         return {
             "status": "error",
-            "detail": str(exc),
+            "detail": "redis unavailable",
             "latency_ms": round((time.perf_counter() - t0) * 1000, 2),
         }
 

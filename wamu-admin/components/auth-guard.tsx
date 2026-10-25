@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { LoadingSpinner } from "./loading-spinner";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    const ok = isAuthenticated();
-    setAuthed(ok);
-    setReady(true);
-    if (!ok) router.replace("/login");
-  }, [router]);
+    if (isAuthenticated()) {
+      setAuthed(true);
+      return;
+    }
+    window.location.replace("/login");
+  }, []);
 
-  if (!ready || !authed) {
-    return <LoadingSpinner label="Checking session..." />;
+  if (!authed) {
+    return <LoadingSpinner label="Opening sign in..." />;
   }
 
   return <>{children}</>;

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.media_urls import public_origin
-from app.core.rate_limit import is_rate_limited
+from app.core.rate_limit import client_ip, is_rate_limited
 from app.core.config import get_settings
 from app.models.user import User
 from app.schemas.auth import (
@@ -28,7 +28,7 @@ settings = get_settings()
 async def request_otp(body: PhoneRequest, request: Request, db: AsyncSession = Depends(get_db)):
     # Tunnel demos share one egress IP — skip IP throttle in mock OTP mode.
     if not settings.otp_mock_mode:
-        ip = request.client.host if request.client else "unknown"
+        ip = client_ip(request)
         if await is_rate_limited(f"otp-ip:{ip}", settings.rate_limit_otp_per_hour * 3, 3600):
             from fastapi import HTTPException
 
@@ -40,7 +40,11 @@ async def request_otp(body: PhoneRequest, request: Request, db: AsyncSession = D
 async def verify_otp(
     body: OtpVerifyRequest, request: Request, db: AsyncSession = Depends(get_db)
 ):
-    ip = request.client.host if request.client else None
+    ip = client_ip(request)
+    if await is_rate_limited(f"otp-verify:{body.phone}", 8, 600):
+        raise HTTPException(status_code=429, detail="Too many code attempts. Wait and try again.")
+    if await is_rate_limited(f"otp-verify-ip:{ip}", 30, 600):
+        raise HTTPException(status_code=429, detail="Too many code attempts. Wait and try again.")
     return await auth_service.verify_otp(
         db,
         phone=body.phone,
@@ -84,7 +88,7 @@ async def claim_device_link(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request)
     if await is_rate_limited(f"device-link-claim:{ip}", 30, 3600):
         raise HTTPException(status_code=429, detail="Too many attempts. Try later.")
     return await auth_service.claim_device_link(

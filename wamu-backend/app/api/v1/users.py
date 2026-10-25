@@ -14,6 +14,19 @@ from app.services import trust as trust_service
 router = APIRouter()
 
 
+def _safe_avatar(url: str | None) -> str | None:
+    if url is None:
+        return None
+    value = url.strip()
+    if not value:
+        return None
+    if len(value) > 500 or ".." in value:
+        raise HTTPException(status_code=400, detail="Avatar link is not allowed")
+    if value.startswith("/media-files/") or value.startswith("https://"):
+        return value
+    raise HTTPException(status_code=400, detail="Avatar must be a Wamu photo or an https link")
+
+
 @router.get("/me", response_model=UserResponse)
 async def me(user: User = Depends(get_current_user)):
     return user
@@ -31,7 +44,10 @@ async def update_profile(
         user.profile = UserProfile(user_id=user.id)
         db.add(user.profile)
         await db.flush()
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    if "avatar_url" in data:
+        data["avatar_url"] = _safe_avatar(data["avatar_url"])
+    for field, value in data.items():
         setattr(user.profile, field, value)
     await db.flush()
     await db.refresh(user)
@@ -102,4 +118,7 @@ async def get_user(
     )
     if peer is None or peer.status != "ACTIVE":
         raise HTTPException(status_code=404, detail="User not found")
-    return peer
+    public = UserResponse.model_validate(peer)
+    if peer.id != user.id:
+        public = public.model_copy(update={"phone": "", "email": None, "role": "CUSTOMER"})
+    return public

@@ -20,9 +20,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (getToken()) {
-      router.replace("/");
+      window.location.replace("/");
     }
-  }, [router]);
+  }, []);
 
   async function handleRequestOtp(e: FormEvent) {
     e.preventDefault();

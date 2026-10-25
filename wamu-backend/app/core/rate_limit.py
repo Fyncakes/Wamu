@@ -34,6 +34,16 @@ async def get_redis() -> redis.Redis | None:
         return None
 
 
+def client_ip(request) -> str:
+    """Client address for limits. Trust X-Forwarded-For only from a private proxy."""
+    peer = request.client.host if getattr(request, "client", None) else ""
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    proxy = peer.startswith(("10.", "127.", "100.64.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2", "172.3", "::1"))
+    if forwarded and proxy and len(forwarded) <= 64 and " " not in forwarded:
+        return forwarded
+    return peer or "unknown"
+
+
 async def is_rate_limited(key: str, limit: int, window_seconds: int) -> bool:
     """Return True if the caller should be blocked."""
     client = await get_redis()
