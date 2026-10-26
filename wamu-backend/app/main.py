@@ -255,10 +255,10 @@ async def api_root():
 
 
 _DEFAULT_APK64_URL = (
-    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm64-contacts.apk"
+    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm64-2104.apk"
 )
 _DEFAULT_APK32_URL = (
-    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm32-contacts.apk"
+    "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm32-2104.apk"
 )
 
 
