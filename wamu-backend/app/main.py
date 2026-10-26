@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import api_router
@@ -260,6 +260,15 @@ _DEFAULT_APK64_URL = (
 _DEFAULT_APK32_URL = (
     "https://github.com/Fyncakes/Wamu/releases/download/phone-trial/wamu-arm32-2104.apk"
 )
+
+
+_FAVICON = Path(__file__).resolve().parent / "static" / "favicon.ico"
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Browser tab icon. Stops the install page from logging a missing-file 404."""
+    return FileResponse(_FAVICON, media_type="image/x-icon")
 
 
 @app.get("/get")
