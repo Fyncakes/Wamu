@@ -257,55 +257,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: SizedBox(
-                    height: 104,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _RoleCard(
-                            icon: Icons.shopping_bag_outlined,
-                            title: 'Customer',
-                            subtitle: 'Shop · track',
-                            onTap: () => context.push('/me'),
-                          ),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: _WorkspaceGrid(
+                    cards: [
+                      _RoleCard(
+                        icon: Icons.shopping_bag_outlined,
+                        title: 'Customer',
+                        subtitle: 'Shop · track',
+                        onTap: () => context.push('/me'),
+                      ),
+                      _RoleCard(
+                        icon: Icons.storefront_outlined,
+                        title: 'Merchant',
+                        subtitle: user?.isBusinessOwner == true
+                            ? 'Your shop'
+                            : 'Shop videos and selling',
+                        onTap: () => context.push('/business-owner'),
+                      ),
+                      _RoleCard(
+                        icon: Icons.delivery_dining,
+                        title: 'Rider',
+                        subtitle: user?.wantsToRide == true
+                            ? 'Jobs, verification & earnings'
+                            : 'Become a Wamu Rider',
+                        onTap: () => context.push(
+                          user?.wantsToRide == true ? '/rider' : '/rider/onboarding',
                         ),
-                        Expanded(
-                          child: _RoleCard(
-                            icon: Icons.storefront_outlined,
-                            title: 'Merchant',
-                            subtitle: user?.isBusinessOwner == true
-                                ? 'Your shop'
-                                : 'Shop videos and selling',
-                            onTap: () => context.push('/business-owner'),
-                          ),
+                      ),
+                      if (user?.isAdmin == true)
+                        _RoleCard(
+                          icon: Icons.admin_panel_settings_outlined,
+                          title: 'Admin',
+                          subtitle: 'Phone console',
+                          highlight: true,
+                          onTap: () => context.push('/admin'),
                         ),
-                        Expanded(
-                          child: _RoleCard(
-                            icon: Icons.delivery_dining,
-                            title: 'Rider',
-                            subtitle: user?.wantsToRide == true
-                                ? 'Jobs, verification & earnings'
-                                : 'Become a Wamu Rider',
-                            onTap: () => context.push(
-                              user?.wantsToRide == true
-                                  ? '/rider'
-                                  : '/rider/onboarding',
-                            ),
-                          ),
-                        ),
-                        if (user?.isAdmin == true)
-                          Expanded(
-                            child: _RoleCard(
-                              icon: Icons.admin_panel_settings_outlined,
-                              title: 'Admin',
-                              subtitle: 'Phone console',
-                              highlight: true,
-                              onTap: () => context.push('/admin'),
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -535,6 +522,38 @@ class _YouTile extends StatelessWidget {
   }
 }
 
+/// Two columns on a phone so titles stay whole. One row when the screen is wide.
+class _WorkspaceGrid extends StatelessWidget {
+  const _WorkspaceGrid({required this.cards});
+
+  final List<Widget> cards;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 560;
+        final cols = wide ? cards.length : 2;
+        const gap = 8.0;
+        final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
+        final stretchLast = !wide && cards.length.isOdd;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (var i = 0; i < cards.length; i++)
+              SizedBox(
+                width: stretchLast && i == cards.length - 1 ? constraints.maxWidth : width,
+                height: wide ? 108 : 96,
+                child: cards[i],
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _RoleCard extends StatelessWidget {
   const _RoleCard({
     required this.icon,
@@ -562,46 +581,44 @@ class _RoleCard extends StatelessWidget {
         : (dark ? const Color(0xFFB8C0C4) : const Color(0xFF667781));
     final iconColor = highlight ? Colors.black : AppTheme.accentGreen;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Material(
-        color: bg,
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, color: iconColor, size: 22),
-                  const Spacer(),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: fg,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.25,
-                      fontWeight: FontWeight.w500,
-                      color: muted,
-                    ),
-                  ),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: iconColor, size: 22),
+              const Spacer(),
+              Text(
+                title,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  height: 1.1,
+                  color: fg,
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.2,
+                  fontWeight: FontWeight.w500,
+                  color: muted,
+                ),
+              ),
+            ],
           ),
         ),
       ),

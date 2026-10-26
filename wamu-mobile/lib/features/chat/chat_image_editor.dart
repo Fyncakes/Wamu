@@ -17,19 +17,32 @@ class ChatImageEditResult {
 Future<ChatImageEditResult?> showChatImageEditor(
   BuildContext context, {
   required Uint8List bytes,
+  bool showCaption = true,
+  String doneLabel = 'Done',
 }) {
   return Navigator.of(context).push<ChatImageEditResult>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => ChatImageEditorScreen(bytes: bytes),
+      builder: (_) => ChatImageEditorScreen(
+        bytes: bytes,
+        showCaption: showCaption,
+        doneLabel: doneLabel,
+      ),
     ),
   );
 }
 
 class ChatImageEditorScreen extends StatefulWidget {
-  const ChatImageEditorScreen({super.key, required this.bytes});
+  const ChatImageEditorScreen({
+    super.key,
+    required this.bytes,
+    this.showCaption = true,
+    this.doneLabel = 'Done',
+  });
 
   final Uint8List bytes;
+  final bool showCaption;
+  final String doneLabel;
 
   @override
   State<ChatImageEditorScreen> createState() => _ChatImageEditorScreenState();
@@ -49,7 +62,10 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
   /// Free drag / pinch under the crop frame.
   double _scale = 1;
   Offset _offset = Offset.zero;
+  Offset _cropPan = Offset.zero;
   double _startScale = 1;
+  bool _dragFrame = false;
+  bool _framed = false;
 
   Size _viewport = Size.zero;
 
@@ -114,7 +130,31 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
         bottom -= pad;
       }
     }
-    return Rect.fromLTRB(left, top, right, bottom);
+    var rect = Rect.fromLTRB(left, top, right, bottom).shift(_cropPan);
+    const edge = 8.0;
+    var dx = 0.0;
+    var dy = 0.0;
+    if (rect.left < edge) dx = edge - rect.left;
+    if (rect.top < edge) dy = edge - rect.top;
+    if (rect.right > viewport.width - edge) dx = viewport.width - edge - rect.right;
+    if (rect.bottom > viewport.height - edge) dy = viewport.height - edge - rect.bottom;
+    return rect.shift(Offset(dx, dy));
+  }
+
+  bool _onFrame(Offset point, Rect crop) {
+    const slop = 32.0;
+    final outer = crop.inflate(slop);
+    final inner = crop.deflate(slop);
+    return outer.contains(point) && !inner.contains(point);
+  }
+
+  void _framePhotoToCrop() {
+    if (_framed || _viewport == Size.zero) return;
+    final fitted = _fittedSize(_viewport);
+    final crop = _cropRect(_viewport);
+    if (fitted.width <= 1 || fitted.height <= 1) return;
+    _scale = math.max(crop.width / fitted.width, crop.height / fitted.height).clamp(0.5, 6.0);
+    _framed = true;
   }
 
   Future<void> _rotate() async {
@@ -127,6 +167,8 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
     _workingBytes = Uint8List.fromList(img.encodeJpg(rotated, quality: 92));
     _scale = 1;
     _offset = Offset.zero;
+    _cropPan = Offset.zero;
+    _framed = false;
     if (mounted) setState(() => _busy = false);
   }
 
@@ -145,6 +187,8 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
     setState(() {
       _scale = 1;
       _offset = Offset.zero;
+      _cropPan = Offset.zero;
+      _framed = false;
       _brightness = 0;
       _contrast = 1;
       _aspect = _AspectPreset.free;
@@ -220,13 +264,17 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
 
   void _onScaleStart(ScaleStartDetails details) {
     _startScale = _scale;
+    _dragFrame = _onFrame(details.localFocalPoint, _cropRect(_viewport));
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     setState(() {
-      _scale = (_startScale * details.scale).clamp(1.0, 6.0);
-      // Free drag / drop style pan
-      _offset += details.focalPointDelta;
+      if (_dragFrame) {
+        _cropPan += details.focalPointDelta;
+      } else {
+        _scale = (_startScale * details.scale).clamp(0.5, 6.0);
+        _offset += details.focalPointDelta;
+      }
     });
   }
 
@@ -249,8 +297,8 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
           ),
           TextButton(
             onPressed: _busy ? null : _applyAndSend,
-            child: Text(
-              'Done',
+              child: Text(
+              widget.doneLabel,
               style: TextStyle(
                 color: _busy ? Colors.white38 : AppTheme.accentGreen,
                 fontWeight: FontWeight.w800,
@@ -266,15 +314,20 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
               builder: (context, constraints) {
                 _viewport = Size(constraints.maxWidth, constraints.maxHeight);
                 final fitted = _fittedSize(_viewport);
-                return Stack(
+                if (!_framed) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted || _framed) return;
+                    setState(_framePhotoToCrop);
+                  });
+                }
+                return GestureDetector(
+                  onScaleStart: _onScaleStart,
+                  onScaleUpdate: _onScaleUpdate,
+                  behavior: HitTestBehavior.opaque,
+                  child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Drag anywhere to move the photo
-                    GestureDetector(
-                      onScaleStart: _onScaleStart,
-                      onScaleUpdate: _onScaleUpdate,
-                      behavior: HitTestBehavior.opaque,
-                      child: ColoredBox(
+                    ColoredBox(
                         color: Colors.black,
                         child: Center(
                           child: Transform.translate(
@@ -297,8 +350,7 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                           ),
                         ),
                       ),
-                    ),
-                    // Crop frame — ignores pointers so drag goes to image
+                    // Crop frame — drag the green edge to move it
                     IgnorePointer(
                       child: CustomPaint(
                         painter: _CropFramePainter(crop: _cropRect(_viewport)),
@@ -309,7 +361,7 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                       right: 0,
                       bottom: 12,
                       child: Text(
-                        'Drag to move · Pinch to zoom',
+                        'Drag the photo to move it · Drag the green frame to move the crop',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
@@ -322,6 +374,7 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                         ),
                       ),
                   ],
+                ),
                 );
               },
             ),
@@ -343,14 +396,14 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                         label: 'Zoom +',
                         onTap: _busy
                             ? null
-                            : () => setState(() => _scale = (_scale * 1.15).clamp(1.0, 6.0)),
+                            : () => setState(() => _scale = (_scale * 1.15).clamp(0.5, 6.0)),
                       ),
                       _ToolBtn(
                         icon: Icons.zoom_out,
                         label: 'Zoom −',
                         onTap: _busy
                             ? null
-                            : () => setState(() => _scale = (_scale / 1.15).clamp(1.0, 6.0)),
+                            : () => setState(() => _scale = (_scale / 1.15).clamp(0.5, 6.0)),
                       ),
                       _ToolBtn(
                         icon: Icons.center_focus_strong,
@@ -375,7 +428,10 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                             child: ChoiceChip(
                               label: Text(e.$2),
                               selected: _aspect == e.$1,
-                              onSelected: (_) => setState(() => _aspect = e.$1),
+                              onSelected: (_) => setState(() {
+                                _aspect = e.$1;
+                                _framed = false;
+                              }),
                               selectedColor: AppTheme.accentGreen,
                               labelStyle: TextStyle(
                                 color: _aspect == e.$1 ? Colors.black : Colors.white70,
@@ -404,6 +460,7 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                     max: 1.45,
                     onChanged: (v) => setState(() => _contrast = v),
                   ),
+                  if (widget.showCaption) ...[
                   const SizedBox(height: 8),
                   TextField(
                     controller: _captionCtrl,
@@ -427,6 +484,7 @@ class _ChatImageEditorScreenState extends State<ChatImageEditorScreen> {
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _applyAndSend(),
                   ),
+                  ],
                 ],
               ),
             ),

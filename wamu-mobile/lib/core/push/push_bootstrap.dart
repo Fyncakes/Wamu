@@ -5,15 +5,19 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flutter/material.dart';
+
 import '../../firebase_options.dart';
 import '../../features/profile/commerce_notif_provider.dart';
+import '../routing/app_router.dart';
 import '../storage/secure_storage.dart';
+import 'chat_focus.dart';
 import 'push_token_repository.dart';
 
-/// Background isolate entry — keep data-only; never log message bodies.
+/// Background isolate entry. The OS shows the generic notification payload.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Wake only — UI reads the authenticated inbox. No plaintext toast here.
+  // Wake only. Do not build a second notification here.
 }
 
 /// Initializes Firebase + FCM when options are configured (store builds).
@@ -75,17 +79,74 @@ class PushBootstrap {
       unawaited(registerPushTokenIfSupported(_ref, token: token));
     });
 
-    // Foreground: refresh in-app commerce inbox (shell snackbar / badge).
     _foregroundSub?.cancel();
-    _foregroundSub = FirebaseMessaging.onMessage.listen((_) {
-      unawaited(_refreshCommerceInbox());
+    _foregroundSub = FirebaseMessaging.onMessage.listen((message) {
+      if (_isChatPush(message)) {
+        _onChatPush(message, tapped: false);
+      } else {
+        unawaited(_refreshCommerceInbox());
+      }
     });
 
-    // Notification tap while app in background → refresh so deeplink snackbar can fire.
     _openedSub?.cancel();
-    _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((_) {
-      unawaited(_refreshCommerceInbox());
+    _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      if (_isChatPush(message)) {
+        _onChatPush(message, tapped: true);
+      } else {
+        unawaited(_refreshCommerceInbox());
+      }
     });
+
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      if (_isChatPush(initial)) {
+        _onChatPush(initial, tapped: true);
+      }
+    }
+  }
+
+  bool _isChatPush(RemoteMessage message) {
+    final type = message.data['type'] ?? '';
+    return type == 'NEW_MESSAGE' && (message.data['conversation_id'] ?? '').isNotEmpty;
+  }
+
+  String _chatLabel(RemoteMessage message) {
+    final kind = (message.data['message_kind'] ?? '').toUpperCase();
+    switch (kind) {
+      case 'IMAGE':
+        return 'Photo';
+      case 'VOICE':
+        return 'Voice message';
+      case 'DOCUMENT':
+        return 'Document';
+      default:
+        return 'New message';
+    }
+  }
+
+  void _onChatPush(RemoteMessage message, {required bool tapped}) {
+    final id = message.data['conversation_id'] ?? '';
+    if (id.isEmpty) return;
+    if (tapped) {
+      _ref.read(pendingChatOpenProvider.notifier).state = id;
+      return;
+    }
+    final open = _ref.read(openChatIdProvider);
+    if (open == id) return;
+    final context = _ref.read(appRouterProvider).routerDelegate.navigatorKey.currentContext;
+    if (context == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(_chatLabel(message)),
+        action: SnackBarAction(
+          label: 'Open',
+          onPressed: () {
+            _ref.read(pendingChatOpenProvider.notifier).state = id;
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _refreshCommerceInbox() async {

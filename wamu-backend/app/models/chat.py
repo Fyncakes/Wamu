@@ -112,6 +112,9 @@ class Message(UUIDMixin, Base):
     client_message_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     # Delivery status for the recipient side (sent/delivered/read simplified)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="SENT")
+    # First time a recipient device confirmed delivery / opened the thread.
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reply_to_message_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("messages.id", ondelete="SET NULL"),

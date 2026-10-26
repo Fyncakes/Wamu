@@ -173,6 +173,8 @@ class ChatMessageModel {
     this.reactions = const {},
     this.replyToMessageId,
     this.replyTo,
+    this.deliveredAt,
+    this.readAt,
   });
 
   factory ChatMessageModel.fromJson(Map<String, dynamic> json, {String? currentUserId}) {
@@ -202,6 +204,8 @@ class ChatMessageModel {
       reactions: reactions,
       replyToMessageId: json['reply_to_message_id']?.toString(),
       replyTo: reply,
+      deliveredAt: json['delivered_at']?.toString(),
+      readAt: json['read_at']?.toString(),
     );
   }
 
@@ -215,6 +219,8 @@ class ChatMessageModel {
   final Map<String, int> reactions;
   final String? replyToMessageId;
   final MessageReplyPreview? replyTo;
+  final String? deliveredAt;
+  final String? readAt;
 
   bool get isImage => messageType == 'IMAGE';
   bool get isVoice => messageType == 'VOICE';
@@ -234,6 +240,8 @@ class ChatMessageModel {
         if (mediaUrl != null) 'media_url': mediaUrl,
         'reactions': reactions,
         if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+        if (deliveredAt != null) 'delivered_at': deliveredAt,
+        if (readAt != null) 'read_at': readAt,
         if (replyTo != null)
           'reply_to': {
             'id': replyTo!.id,
@@ -268,6 +276,8 @@ class ChatMessageModel {
       reactions: reactions,
       replyToMessageId: json['reply_to_message_id']?.toString(),
       replyTo: reply,
+      deliveredAt: json['delivered_at']?.toString(),
+      readAt: json['read_at']?.toString(),
     );
   }
 
@@ -279,6 +289,8 @@ class ChatMessageModel {
     String? content,
     String? messageType,
     String? mediaUrl,
+    String? deliveredAt,
+    String? readAt,
   }) {
     return ChatMessageModel(
       id: id,
@@ -291,6 +303,8 @@ class ChatMessageModel {
       reactions: reactions ?? this.reactions,
       replyToMessageId: replyToMessageId ?? this.replyToMessageId,
       replyTo: replyTo ?? this.replyTo,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
+      readAt: readAt ?? this.readAt,
     );
   }
 }

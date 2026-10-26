@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
@@ -251,6 +252,16 @@ async def list_messages(
                 "event": "message.status",
                 "ids": [str(i) for i in newly_ids],
                 "status": applied,
+                **(
+                    {"delivered_at": datetime.now(timezone.utc).isoformat()}
+                    if applied in ("DELIVERED", "READ")
+                    else {}
+                ),
+                **(
+                    {"read_at": datetime.now(timezone.utc).isoformat()}
+                    if applied == "READ"
+                    else {}
+                ),
             },
         )
     return [
@@ -294,7 +305,13 @@ async def ack_message(
         {
             "event": "message.status",
             "ids": [str(msg.id)],
-            "status": msg.status,
+            "status": resp.status,
+            **(
+                {"delivered_at": resp.delivered_at.isoformat()}
+                if resp.delivered_at is not None
+                else {}
+            ),
+            **({"read_at": resp.read_at.isoformat()} if resp.read_at is not None else {}),
         },
     )
     return resp

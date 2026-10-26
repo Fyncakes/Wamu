@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import Base, get_db
 from app.core.security import hash_token
-from app.integrations.push.fcm import assert_no_plaintext_leak
+from app.integrations.push.fcm import assert_no_plaintext_leak, build_fcm_payload
 from app.main import app
 from app.models.chat import ConversationMember
 from app.models.user import OtpChallenge, User, UserProfile, UserRole
@@ -81,6 +81,19 @@ def test_assert_no_plaintext_ok_generic():
     )
 
 
+def test_fcm_payload_is_generic_and_tappable():
+    payload = build_fcm_payload(
+        token="token",
+        title="Wamu",
+        body="Photo",
+        data={"type": "NEW_MESSAGE", "conversation_id": "abc", "message_kind": "IMAGE"},
+    )
+    assert payload["notification"]["body"] == "Photo"
+    assert payload["data"]["conversation_id"] == "abc"
+    assert payload["data"]["message_kind"] == "IMAGE"
+    assert "preview" not in payload["data"]
+
+
 @pytest.mark.asyncio
 async def test_upsert_push_token(env):
     client = env["client"]
@@ -132,4 +145,16 @@ async def test_enqueue_skips_muted_and_uses_generic_copy():
         assert args[1] == "Wamu"
         assert args[2] == "New message"
         assert "conversation_id" in args[3]
+        assert args[3]["message_kind"] == "TEXT"
         assert "preview" not in args[3]
+
+    with patch("app.workers.tasks.send_push_notification") as task:
+        task.delay = MagicMock()
+        _enqueue_message_pushes(
+            conversation_id=convo_id,
+            sender_id=sender,
+            members=members,
+            message_type="VOICE",
+        )
+        assert task.delay.call_args.args[2] == "Voice message"
+        assert task.delay.call_args.args[3]["message_kind"] == "VOICE"

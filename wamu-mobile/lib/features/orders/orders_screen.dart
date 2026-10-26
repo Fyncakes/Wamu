@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/network/api_error.dart';
+import '../../core/storage/secure_storage.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/order_model.dart';
 import '../../shared/utils/maps_nav.dart';
@@ -100,7 +101,22 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
   List<OrderModel>? _orders;
   Object? _error;
   bool _loading = true;
+  bool _historyCleared = false;
   Timer? _poll;
+  Set<String> _hiddenOrderIds = {};
+
+  static const _hiddenKey = 'wamu_hidden_order_ids';
+
+  bool _isFinished(String status) {
+    switch (status.toUpperCase()) {
+      case 'DELIVERED':
+      case 'CANCELLED':
+      case 'REFUNDED':
+        return true;
+      default:
+        return false;
+    }
+  }
 
   @override
   void initState() {
@@ -142,9 +158,14 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final orders = await ref.read(ordersRepositoryProvider).getOrders();
+      final raw = await ref.read(secureStorageProvider).read(_hiddenKey);
+      final hidden = (raw == null || raw.isEmpty)
+          ? <String>{}
+          : raw.split(',').where((id) => id.isNotEmpty).toSet();
       if (!mounted) return;
       setState(() {
-        _orders = orders;
+        _hiddenOrderIds = hidden;
+        _orders = orders.where((order) => !hidden.contains(order.id)).toList();
         _error = null;
         _loading = false;
       });
@@ -158,12 +179,53 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     }
   }
 
+  Future<void> _clearHistory() async {
+    final orders = _orders;
+    if (orders == null) return;
+    final finished = orders.where((order) => _isFinished(order.status)).toList();
+    if (finished.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Open orders stay on this page.')),
+      );
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear order history?'),
+        content: const Text(
+          'Delivered, cancelled, and refunded orders leave this list on this phone. '
+          'Shops keep their records. Orders still in progress stay.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Clear')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final next = {..._hiddenOrderIds, ...finished.map((order) => order.id)};
+    await ref.read(secureStorageProvider).write(_hiddenKey, next.join(','));
+    if (!mounted) return;
+    setState(() {
+      _hiddenOrderIds = next;
+      _orders = orders.where((order) => !next.contains(order.id)).toList();
+      _historyCleared = _orders!.isEmpty;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Orders'),
         actions: [
+          IconButton(
+            tooltip: 'Clear history',
+            onPressed: _clearHistory,
+            icon: const Icon(Icons.delete_sweep_outlined),
+          ),
           if (_poll?.isActive == true)
             const Padding(
               padding: EdgeInsets.only(right: 12),
@@ -191,7 +253,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
                         children: [
                           Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 12),
-                          const Text('You have no orders yet.'),
+                          Text(
+                            _historyCleared
+                                ? 'Finished orders are hidden on this phone.'
+                                : 'You have no orders yet.',
+                          ),
                           TextButton(
                             onPressed: () => context.go('/home'),
                             child: const Text('Browse shops'),

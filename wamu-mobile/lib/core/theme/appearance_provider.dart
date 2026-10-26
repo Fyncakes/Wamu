@@ -8,15 +8,23 @@ class AppearanceSettings {
   const AppearanceSettings({
     this.themeMode = ThemeMode.dark,
     this.wallpaperId = 'crest',
+    this.customWallpaperPath,
   });
 
   final ThemeMode themeMode;
   final String wallpaperId;
+  final String? customWallpaperPath;
 
-  AppearanceSettings copyWith({ThemeMode? themeMode, String? wallpaperId}) {
+  AppearanceSettings copyWith({
+    ThemeMode? themeMode,
+    String? wallpaperId,
+    String? customWallpaperPath,
+    bool clearCustom = false,
+  }) {
     return AppearanceSettings(
       themeMode: themeMode ?? this.themeMode,
       wallpaperId: wallpaperId ?? this.wallpaperId,
+      customWallpaperPath: clearCustom ? null : (customWallpaperPath ?? this.customWallpaperPath),
     );
   }
 }
@@ -29,16 +37,19 @@ class AppearanceNotifier extends StateNotifier<AppearanceSettings> {
   final SecureStorageService _storage;
   static const _themeKey = 'wamu_theme_mode';
   static const _wallpaperKey = 'wamu_chat_wallpaper';
+  static const _wallpaperFileKey = 'wamu_chat_wallpaper_file';
 
   Future<void> _restore() async {
     final themeRaw = await _storage.read(_themeKey);
     final wallRaw = await _storage.read(_wallpaperKey);
+    final fileRaw = await _storage.read(_wallpaperFileKey);
     ThemeMode mode = ThemeMode.dark;
     if (themeRaw == 'light') mode = ThemeMode.light;
     if (themeRaw == 'system') mode = ThemeMode.system;
     state = AppearanceSettings(
       themeMode: mode,
       wallpaperId: (wallRaw == null || wallRaw.isEmpty) ? 'crest' : wallRaw,
+      customWallpaperPath: (fileRaw == null || fileRaw.isEmpty) ? null : fileRaw,
     );
   }
 
@@ -53,8 +64,15 @@ class AppearanceNotifier extends StateNotifier<AppearanceSettings> {
   }
 
   Future<void> setWallpaper(String id) async {
-    state = state.copyWith(wallpaperId: id);
+    state = state.copyWith(wallpaperId: id, clearCustom: id != 'custom');
     await _storage.write(_wallpaperKey, id);
+    if (id != 'custom') await _storage.delete(_wallpaperFileKey);
+  }
+
+  Future<void> setCustomWallpaper(String path) async {
+    state = state.copyWith(wallpaperId: 'custom', customWallpaperPath: path);
+    await _storage.write(_wallpaperKey, 'custom');
+    await _storage.write(_wallpaperFileKey, path);
   }
 }
 

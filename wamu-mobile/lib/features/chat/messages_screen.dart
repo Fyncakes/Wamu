@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../../core/push/chat_focus.dart';
 import '../../core/media/data_saver_image.dart';
 import '../../core/media_url.dart';
 import '../../core/network/api_error.dart';
@@ -48,6 +49,7 @@ import 'receipt_composer_sheet.dart';
 import 'chat_repository.dart';
 import 'chat_voice_note.dart';
 import 'chat_wallpaper.dart';
+import 'emoji_panel.dart';
 import 'contact_avatar.dart';
 import 'document_pick.dart';
 import 'inbox_snapshot_provider.dart';
@@ -1155,6 +1157,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _error;
   String? _typingLabel;
   String? _playingId;
+  String? _pausedVoiceId;
+  double _voiceRate = 1;
+  final Map<String, Duration> _voiceLengths = {};
   Duration _voicePosition = Duration.zero;
   Duration _voiceDuration = Duration.zero;
   StreamSubscription<Duration>? _voicePosSub;
@@ -1182,25 +1187,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final Set<String> _selectedIds = {};
 
   static const _reactionEmojis = ['🔥', '😂', '❤️', '👍', '🙌', '😮', '😢', '🙏'];
-  static const _composerEmojis = [
-    // Smileys
-    '😀', '😁', '😂', '🥹', '😅', '😍', '🥰', '😎',
-    '🫡', '🤔', '😴', '😭', '😤', '🤯', '😈', '👻',
-    // Gestures
-    '👍', '👎', '👏', '🙌', '🙏', '🤝', '💪', '✌️',
-    '🤞', '👋', '🫶', '❤️', '🔥', '✨', '💯', '⭐',
-    // Uganda / everyday
-    '🇺🇬', '☕', '🍰', '🍕', '🍻', '⚽', '📱', '🎶',
-    '☀️', '🌧️', '🌙', '🎉', '🎂', '🚌', '🏠', '💼',
-  ];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(openChatIdProvider.notifier).state = widget.conversationId;
+    });
     _voicePosSub = _player.onPositionChanged.listen((value) {
       if (mounted) setState(() => _voicePosition = value);
     });
     _voiceDurSub = _player.onDurationChanged.listen((value) {
+      final id = _playingId ?? _pausedVoiceId;
+      if (id != null && value > Duration.zero) {
+        _voiceLengths[id] = value;
+      }
       if (mounted) setState(() => _voiceDuration = value);
     });
     _bootstrap();
@@ -1821,10 +1823,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (event == 'message.status') {
         final ids = (data['ids'] as List?)?.map((e) => e.toString()).toSet() ?? {};
         final status = data['status']?.toString() ?? 'DELIVERED';
+        final deliveredAt = data['delivered_at']?.toString();
+        final readAt = data['read_at']?.toString();
         setState(() {
           _messages = [
             for (final m in _messages)
-              if (ids.contains(m.id)) m.copyWith(status: status) else m,
+              if (ids.contains(m.id))
+                m.copyWith(
+                  status: status,
+                  deliveredAt: m.deliveredAt ?? deliveredAt,
+                  readAt: status == 'READ' ? (m.readAt ?? readAt) : m.readAt,
+                )
+              else
+                m,
           ];
         });
         return;
@@ -2448,37 +2459,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  String _speedLabel() {
+    if ((_voiceRate - 1.5).abs() < 0.01) return '1.5×';
+    if ((_voiceRate - 2).abs() < 0.01) return '2×';
+    return '1×';
+  }
+
+  Future<void> _cycleVoiceRate() async {
+    final next = _voiceRate < 1.25
+        ? 1.5
+        : _voiceRate < 1.75
+            ? 2.0
+            : 1.0;
+    setState(() => _voiceRate = next);
+    try {
+      await _player.setPlaybackRate(next);
+    } catch (_) {}
+  }
+
+  Duration _voicePosFor(String id) {
+    if (_playingId == id || _pausedVoiceId == id) return _voicePosition;
+    return Duration.zero;
+  }
+
+  Duration _voiceLenFor(String id) {
+    if ((_playingId == id || _pausedVoiceId == id) && _voiceDuration > Duration.zero) {
+      return _voiceDuration;
+    }
+    return _voiceLengths[id] ?? Duration.zero;
+  }
+
   Future<void> _playVoice(ChatMessageModel msg) async {
     final url = resolveMediaUrl(msg.mediaUrl);
     if (url == null || url.isEmpty) return;
     if (_playingId == msg.id) {
-      await _player.stop();
-      setState(() {
-        _playingId = null;
-        _voicePosition = Duration.zero;
-      });
+      await _player.pause();
+      if (mounted) {
+        setState(() {
+          _pausedVoiceId = msg.id;
+          _playingId = null;
+        });
+      }
+      return;
+    }
+    if (_pausedVoiceId == msg.id) {
+      await _player.resume();
+      try {
+        await _player.setPlaybackRate(_voiceRate);
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _playingId = msg.id;
+          _pausedVoiceId = null;
+        });
+      }
       return;
     }
     await _player.stop();
     setState(() {
       _playingId = msg.id;
+      _pausedVoiceId = null;
       _voicePosition = Duration.zero;
-      _voiceDuration = Duration.zero;
+      _voiceDuration = _voiceLengths[msg.id] ?? Duration.zero;
     });
     try {
       await _player.play(UrlSource(url));
+      await _player.setPlaybackRate(_voiceRate);
       _player.onPlayerComplete.first.then((_) {
-        if (mounted) {
+        if (mounted && _playingId == msg.id) {
           setState(() {
             _playingId = null;
+            _pausedVoiceId = null;
             _voicePosition = Duration.zero;
           });
         }
       });
     } catch (e) {
-      setState(() => _playingId = null);
+      setState(() {
+        _playingId = null;
+        _pausedVoiceId = null;
+      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not play this voice message. Tap to retry.')),
+        );
       }
     }
   }
@@ -2595,6 +2659,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           icon: Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
                           label: Text('Delete'),
                         ),
+                      if (msg.isMine && !msg.id.startsWith('local-'))
+                        TextButton.icon(
+                          onPressed: () => Navigator.pop(ctx, 'info'),
+                          icon: Icon(Icons.info_outline, size: 18, color: AppTheme.accentGreen),
+                          label: const Text('Info'),
+                        ),
                       TextButton.icon(
                         onPressed: () => Navigator.pop(ctx, 'copy'),
                         icon: Icon(
@@ -2622,6 +2692,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _enterSelect(msg);
     } else if (action == 'delete') {
       await _deleteMessages([msg]);
+    } else if (action == 'info') {
+      _showMessageInfo(msg);
     } else if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: msg.content));
       if (mounted) {
@@ -2846,6 +2918,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _showMessageInfo(ChatMessageModel msg) {
+    String line(String label, String? iso, String empty) {
+      final value = _timeOf(iso);
+      final day = iso == null ? '' : _dayOf(iso);
+      final shown = value.isEmpty ? empty : (day.isEmpty ? value : '$day $value');
+      return '$label: $shown';
+    }
+
+    final status = msg.status.toUpperCase();
+    final sentMeaning = status == 'SENDING' || status == 'QUEUED'
+        ? 'Still sending.'
+        : 'Sent means Wamu has the message. It does not mean the other person is offline.';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Message info'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(line('Sent', msg.createdAt, 'Waiting')),
+            const SizedBox(height: 8),
+            Text(line('Delivered', msg.deliveredAt, 'Not yet')),
+            const SizedBox(height: 8),
+            Text(line('Read', msg.readAt, 'Not yet')),
+            const SizedBox(height: 12),
+            Text(
+              _isGroup
+                  ? 'In a group, delivered and read update when someone in the chat receives or opens the message. $sentMeaning'
+                  : sentMeaning,
+              style: TextStyle(color: AppTheme.muted(context), fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  String _dayOf(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.day}/${dt.month}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   String _timeOf(String? iso) {
     if (iso == null) return '';
     try {
@@ -2856,11 +2979,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Widget _statusTicks(ChatMessageModel msg) {
+  Widget _statusTicks(ChatMessageModel msg, {bool onPhoto = false}) {
     if (!msg.isMine) return const SizedBox.shrink();
+    final muted = onPhoto ? Colors.white70 : AppTheme.muted(context);
     final s = msg.status.toUpperCase();
     if (s == 'SENDING' || s == 'QUEUED') {
-      return Icon(Icons.schedule, size: 14, color: AppTheme.muted(context));
+      return Icon(Icons.schedule, size: 14, color: muted);
     }
     if (s == 'FAILED') {
       return const Icon(Icons.error_outline, size: 14, color: Colors.orangeAccent);
@@ -2869,9 +2993,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return const Icon(Icons.done_all, size: 16, color: Color(0xFF53BDEB));
     }
     if (s == 'DELIVERED') {
-      return Icon(Icons.done_all, size: 16, color: AppTheme.muted(context));
+      return Icon(Icons.done_all, size: 16, color: muted);
     }
-    return Icon(Icons.done, size: 16, color: AppTheme.muted(context));
+    return Icon(Icons.done, size: 16, color: muted);
   }
 
   Widget _quoteBlock(MessageReplyPreview reply, {required bool mine}) {
@@ -3495,7 +3619,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ChatMediaImage(
               imageUrl: msg.mediaUrl,
               width: photoWidth,
-              height: photoWidth * 0.78,
               radius: 12,
             ),
             Positioned(
@@ -3516,7 +3639,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     if (msg.isMine) ...[
                       const SizedBox(width: 3),
-                      _statusTicks(msg),
+                      _statusTicks(msg, onPhoto: true),
                     ],
                   ],
                 ),
@@ -3589,19 +3712,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final me = ref.read(authProvider).user;
       final avatar = msg.isMine ? me?.avatarUrl : _peerAvatarUrl;
       final active = _playingId == msg.id;
+      final focused = active || _pausedVoiceId == msg.id;
       kids.add(
         ChatVoiceNote(
           playing: active,
           foreground: onMine,
-          position: active ? _voicePosition : Duration.zero,
-          duration: active ? _voiceDuration : Duration.zero,
+          position: _voicePosFor(msg.id),
+          duration: _voiceLenFor(msg.id),
           sentLabel: _timeOf(msg.createdAt),
           avatarUrl: avatar,
           ticks: msg.isMine ? _statusTicks(msg) : null,
+          speedLabel: _speedLabel(),
+          onSpeed: _cycleVoiceRate,
+          seed: msg.id,
           onPlay: () => _playVoice(msg),
-          onSeek: active
+          onSeek: focused
               ? (fraction) {
-                  final total = _voiceDuration.inMilliseconds;
+                  final total = _voiceLenFor(msg.id).inMilliseconds;
                   if (total <= 0) return;
                   _player.seek(Duration(milliseconds: (total * fraction).round()));
                 }
@@ -3627,6 +3754,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    final open = ref.read(openChatIdProvider);
+    if (open == widget.conversationId) {
+      ref.read(openChatIdProvider.notifier).state = null;
+    }
     _typingDebounce?.cancel();
     _presencePing?.cancel();
     _voicePosSub?.cancel();
@@ -4039,34 +4170,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       if (_showEmoji)
                         Container(
-                          height: 220,
+                          height: 300,
                           color: AppTheme.messengerSurface,
-                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                          child: GridView.count(
-                            crossAxisCount: 8,
-                            children: _composerEmojis
-                                .map(
-                                  (e) => InkWell(
-                                    onTap: () {
-                                      final t = _messageController.text;
-                                      final sel = _messageController.selection;
-                                      final start = sel.start >= 0 ? sel.start : t.length;
-                                      final end = sel.end >= 0 ? sel.end : t.length;
-                                      final next = t.replaceRange(start, end, e);
-                                      _messageController.value = TextEditingValue(
-                                        text: next,
-                                        selection: TextSelection.collapsed(
-                                          offset: start + e.length,
-                                        ),
-                                      );
-                                      setState(() {});
-                                    },
-                                    child: Center(
-                                      child: Text(e, style: TextStyle(fontSize: 24)),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
+                          padding: const EdgeInsets.only(top: 6),
+                          child: WamuEmojiPanel(
+                            onPick: (e) {
+                              final t = _messageController.text;
+                              final sel = _messageController.selection;
+                              final start = sel.start >= 0 ? sel.start : t.length;
+                              final end = sel.end >= 0 ? sel.end : t.length;
+                              final next = t.replaceRange(start, end, e);
+                              _messageController.value = TextEditingValue(
+                                text: next,
+                                selection: TextSelection.collapsed(
+                                  offset: start + e.length,
+                                ),
+                              );
+                              setState(() {});
+                            },
                           ),
                         ),
                       SafeArea(

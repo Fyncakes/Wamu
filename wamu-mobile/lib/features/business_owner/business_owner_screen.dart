@@ -23,6 +23,7 @@ import '../auth/auth_provider.dart';
 import '../businesses/favorites_repository.dart';
 import '../home/catalog_repository.dart';
 import '../move/riders_repository.dart';
+import '../chat/chat_image_editor.dart';
 import '../orders/orders_repository.dart';
 import 'owner_products_repository.dart';
 
@@ -559,8 +560,10 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                   maxWidth: 1600,
                   imageQuality: 85,
                 );
-                if (file == null) return;
-                setLocal(() => pickedImage = file);
+                if (file == null || !ctx.mounted) return;
+                final edited = await _positionPhoto(ctx, file);
+                if (edited == null) return;
+                setLocal(() => pickedImage = edited);
               }
 
               return SingleChildScrollView(
@@ -793,6 +796,23 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
     if (saved == true) await _reloadProducts();
   }
 
+  Future<XFile?> _positionPhoto(BuildContext context, XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (!context.mounted) return null;
+    final edited = await showChatImageEditor(
+      context,
+      bytes: bytes,
+      showCaption: false,
+      doneLabel: 'Use photo',
+    );
+    if (edited == null) return null;
+    return XFile.fromData(
+      edited.bytes,
+      mimeType: 'image/jpeg',
+      name: 'wamu-product.jpg',
+    );
+  }
+
   Future<void> _pickAndUploadImage(ProductModel product) async {
     final picker = ImagePicker();
     final file = await picker.pickImage(
@@ -800,11 +820,13 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
       maxWidth: 1600,
       imageQuality: 85,
     );
-    if (file == null) return;
+    if (file == null || !mounted) return;
+    final edited = await _positionPhoto(context, file);
+    if (edited == null || !mounted) return;
 
     setState(() => _loading = true);
     try {
-      await ref.read(ownerProductsRepositoryProvider).uploadImage(product.id, file);
+      await ref.read(ownerProductsRepositoryProvider).uploadImage(product.id, edited);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Photo uploaded')),

@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/media_url.dart';
-import '../../core/storage/secure_storage.dart';
-import '../../core/theme/network_type_provider.dart';
-import '../../core/theme/storage_settings_provider.dart';
 
 /// Voice note bubble — play control, waveform, duration, and the sender avatar.
 class ChatVoiceNote extends ConsumerStatefulWidget {
@@ -19,6 +16,9 @@ class ChatVoiceNote extends ConsumerStatefulWidget {
     this.onSeek,
     this.avatarUrl,
     this.ticks,
+    this.speedLabel = '1×',
+    this.onSpeed,
+    this.seed = '',
   });
 
   final bool playing;
@@ -30,26 +30,17 @@ class ChatVoiceNote extends ConsumerStatefulWidget {
   final ValueChanged<double>? onSeek;
   final String? avatarUrl;
   final Widget? ticks;
+  final String speedLabel;
+  final VoidCallback? onSpeed;
+
+  /// Stable per message so the bars do not jump between rebuilds.
+  final String seed;
 
   @override
   ConsumerState<ChatVoiceNote> createState() => _ChatVoiceNoteState();
 }
 
 class _ChatVoiceNoteState extends ConsumerState<ChatVoiceNote> {
-  bool _forced = false;
-
-  Future<bool> _shouldAutoLoad(WamuNetworkKind kind) async {
-    final storage = ref.read(storageSettingsProvider);
-    final saverRaw = await ref.read(secureStorageProvider).read('wamu_data_saver');
-    final dataSaver = saverRaw != '0';
-
-    if (kind == WamuNetworkKind.none) return false;
-
-    final onMobile = kind == WamuNetworkKind.mobile || dataSaver;
-    if (onMobile) return storage.autoVoiceMobile;
-    return storage.autoVoiceWifi;
-  }
-
   String _clock(Duration value) {
     final total = value.inSeconds;
     final minutes = total ~/ 60;
@@ -58,37 +49,7 @@ class _ChatVoiceNoteState extends ConsumerState<ChatVoiceNote> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final kind = ref.watch(networkKindProvider);
-    ref.watch(storageSettingsProvider);
-
-    return FutureBuilder<bool>(
-      future: _shouldAutoLoad(kind),
-      builder: (context, snap) {
-        final auto = snap.data ?? false;
-        if (_forced || auto) return _player();
-        final hint = kind == WamuNetworkKind.mobile || kind == WamuNetworkKind.none
-            ? 'Tap to download (mobile data)'
-            : 'Tap to download';
-        return InkWell(
-          onTap: () {
-            setState(() => _forced = true);
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) widget.onPlay();
-            });
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.download_for_offline_outlined, color: widget.foreground, size: 36),
-              const SizedBox(width: 8),
-              Text(hint, style: TextStyle(color: widget.foreground, fontSize: 13)),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => _player();
 
   Widget _player() {
     final totalMs = widget.duration.inMilliseconds;
@@ -105,6 +66,11 @@ class _ChatVoiceNoteState extends ConsumerState<ChatVoiceNote> {
         children: [
           Row(
             children: [
+              _SpeedChip(
+                label: widget.speedLabel,
+                color: widget.foreground,
+                onTap: widget.onSpeed,
+              ),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -130,7 +96,11 @@ class _ChatVoiceNoteState extends ConsumerState<ChatVoiceNote> {
                                 (details.localPosition.dx / width).clamp(0.0, 1.0),
                               );
                             },
-                      child: _Waveform(progress: progress, color: widget.foreground),
+                      child: _Waveform(
+                        progress: progress,
+                        color: widget.foreground,
+                        seed: widget.seed,
+                      ),
                     );
                   },
                 ),
@@ -144,7 +114,7 @@ class _ChatVoiceNoteState extends ConsumerState<ChatVoiceNote> {
             child: Row(
               children: [
                 Text(
-                  '${_clock(shown)} / ${_clock(widget.duration)}',
+                  _clock(shown == Duration.zero ? widget.duration : shown),
                   style: TextStyle(
                     color: widget.foreground.withValues(alpha: 0.75),
                     fontSize: 11,
@@ -171,38 +141,89 @@ class _ChatVoiceNoteState extends ConsumerState<ChatVoiceNote> {
   }
 }
 
+class _SpeedChip extends StatelessWidget {
+  const _SpeedChip({required this.label, required this.color, this.onTap});
+
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: Material(
+        color: color.withValues(alpha: 0.16),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Waveform extends StatelessWidget {
-  const _Waveform({required this.progress, required this.color});
+  const _Waveform({required this.progress, required this.color, required this.seed});
 
   final double progress;
   final Color color;
+  final String seed;
+
+  int _height(int i) {
+    var hash = seed.hashCode;
+    hash = (hash + i * 1103515245) & 0x7fffffff;
+    return 6 + (hash % 18);
+  }
 
   @override
   Widget build(BuildContext context) {
     const bars = 28;
     return SizedBox(
       height: 28,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        alignment: Alignment.centerLeft,
         children: [
-          for (var i = 0; i < bars; i++)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 0.7),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Container(
-                    height: 6 + ((i * 17) % 18).toDouble(),
-                    decoration: BoxDecoration(
-                      color: i / bars <= progress
-                          ? color
-                          : color.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(2),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              for (var i = 0; i < bars; i++)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 0.7),
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        height: _height(i).toDouble(),
+                        decoration: BoxDecoration(
+                          color: i / bars <= progress ? color : color.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment(progress.clamp(0.0, 1.0) * 2 - 1, 0),
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
+          ),
         ],
       ),
     );

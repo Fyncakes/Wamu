@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -14,7 +15,9 @@ class ChatWallpaper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final id = ref.watch(appearanceProvider).wallpaperId;
+    final appearance = ref.watch(appearanceProvider);
+    final id = appearance.wallpaperId;
+    final custom = appearance.customWallpaperPath;
     final light = Theme.of(context).brightness == Brightness.light;
     final bg = switch (id) {
       'lake' => light ? const Color(0xFFD6E8F5) : const Color(0xFF0A1628),
@@ -27,7 +30,9 @@ class ChatWallpaper extends ConsumerWidget {
       fit: StackFit.expand,
       children: [
         ColoredBox(color: bg),
-        if (id != 'plain')
+        if (id == 'custom' && custom != null && custom.startsWith('b64:'))
+          Positioned.fill(child: _CustomWallpaper(data: custom))
+        else if (id != 'plain' && id != 'custom')
           Positioned.fill(
             child: CustomPaint(painter: _WallpaperPainter(id, light: light)),
           ),
@@ -142,4 +147,25 @@ class _WallpaperPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WallpaperPainter oldDelegate) =>
       oldDelegate.id != id || oldDelegate.light != light;
+}
+
+class _CustomWallpaper extends StatelessWidget {
+  const _CustomWallpaper({required this.data});
+
+  final String data;
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final bytes = base64Decode(data.substring(4));
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+      );
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+  }
 }

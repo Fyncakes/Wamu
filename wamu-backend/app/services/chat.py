@@ -8,7 +8,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,13 +29,28 @@ def _visible_message_clause(user_id: uuid.UUID):
     return and_(Message.deleted_at.is_(None), Message.id.notin_(hidden))
 
 
+def push_label_for_message(message_type: str | None) -> str:
+    """Generic lock-screen label. Never the message text."""
+    kind = (message_type or "TEXT").upper()
+    if kind == "IMAGE":
+        return "Photo"
+    if kind == "VOICE":
+        return "Voice message"
+    if kind == "DOCUMENT":
+        return "Document"
+    return "New message"
+
+
 def _enqueue_message_pushes(
     *,
     conversation_id: uuid.UUID,
     sender_id: uuid.UUID,
     members: list[ConversationMember],
+    message_type: str | None = None,
 ) -> None:
-    """Fire-and-forget data-only pushes — never include message plaintext."""
+    """Fire-and-forget pushes — never include message plaintext."""
+    label = push_label_for_message(message_type)
+    kind = (message_type or "TEXT").upper()
     try:
         from app.workers.tasks import send_push_notification
 
@@ -47,10 +62,11 @@ def _enqueue_message_pushes(
             send_push_notification.delay(
                 str(member.user_id),
                 "Wamu",
-                "New message",
+                label,
                 {
                     "type": "NEW_MESSAGE",
                     "conversation_id": str(conversation_id),
+                    "message_kind": kind,
                 },
             )
     except Exception as exc:
@@ -135,6 +151,22 @@ def _reactions_map(msg: Message) -> dict[str, int]:
     return dict(Counter(r.emoji for r in (msg.reactions or [])))
 
 
+def _advance_receipt(msg: Message, status: str, *, now: datetime | None = None) -> bool:
+    """Move a message forward in SENT → DELIVERED → READ. Idempotent."""
+    rank = {"SENT": 0, "DELIVERED": 1, "READ": 2}
+    current = rank.get(msg.status or "SENT", 0)
+    target = rank.get(status, 0)
+    if target <= current:
+        return False
+    stamped = now or datetime.now(timezone.utc)
+    msg.status = status
+    if status in ("DELIVERED", "READ") and msg.delivered_at is None:
+        msg.delivered_at = stamped
+    if status == "READ" and msg.read_at is None:
+        msg.read_at = stamped
+    return True
+
+
 def _can_send_read_receipt(user: User, convo: Conversation) -> bool:
     """WhatsApp-style: privacy toggle applies to 1:1; groups always send READ."""
     if convo.type == "GROUP":
@@ -200,6 +232,9 @@ def serialize_message(
         "client_message_id": msg.client_message_id,
         "status": status,
         "created_at": msg.created_at,
+        "delivered_at": msg.delivered_at,
+        # Hide the read time when receipts are masked back to delivered.
+        "read_at": msg.read_at if status == "READ" else None,
         "reactions": _reactions_map(msg),
         "reply_to_message_id": msg.reply_to_message_id,
         "reply_to": reply_preview,
@@ -725,6 +760,7 @@ async def send_message(
         conversation_id=convo.id,
         sender_id=user.id,
         members=list(convo.members),
+        message_type=msg.message_type,
     )
     result = await db.execute(
         select(Message)
@@ -752,6 +788,7 @@ async def list_messages(
         .order_by(Message.created_at.desc())
         .limit(min(limit, 100))
     )
+    messages = list(reversed(result.scalars().all()))
     member = await db.scalar(
         select(ConversationMember).where(
             ConversationMember.conversation_id == conversation_id,
@@ -780,13 +817,24 @@ async def list_messages(
             if rank.get(st or "SENT", 0) < target_rank
         ]
         if to_upgrade:
+            stamped = datetime.now(timezone.utc)
+            values: dict = {"status": target}
+            if target in ("DELIVERED", "READ"):
+                values["delivered_at"] = func.coalesce(Message.delivered_at, stamped)
+            if target == "READ":
+                values["read_at"] = func.coalesce(Message.read_at, stamped)
             await db.execute(
-                update(Message).where(Message.id.in_(to_upgrade)).values(status=target)
+                update(Message).where(Message.id.in_(to_upgrade)).values(**values),
+                execution_options={"synchronize_session": False},
             )
+            upgraded = set(to_upgrade)
+            for message in messages:
+                if message.id in upgraded:
+                    _advance_receipt(message, target, now=stamped)
             newly_ids = to_upgrade
             applied = target
         await db.flush()
-    return list(reversed(result.scalars().all())), newly_ids, applied, convo.type
+    return messages, newly_ids, applied, convo.type
 
 
 async def acknowledge_message(
@@ -805,12 +853,8 @@ async def acknowledge_message(
     if status == "READ" and not _can_send_read_receipt(user, convo):
         status = "DELIVERED"
 
-    rank = {"SENT": 0, "DELIVERED": 1, "READ": 2}
-    current = rank.get(msg.status, 0)
-    target = rank[status]
-    if target > current:
-        msg.status = status
-        await db.flush()
+    _advance_receipt(msg, status)
+    await db.flush()
     result = await db.execute(
         select(Message)
         .options(selectinload(Message.reactions), selectinload(Message.reply_to))

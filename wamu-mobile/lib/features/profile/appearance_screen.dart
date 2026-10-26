@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/appearance_provider.dart';
@@ -74,7 +79,7 @@ class AppearanceScreen extends ConsumerWidget {
           Text('Chat wallpaper', style: Theme.of(context).textTheme.titleMedium),
           SizedBox(height: 4),
           Text(
-            'Own Uganda-inspired patterns — not WhatsApp clones.',
+            'Uganda-inspired patterns, or a photo from this phone.',
             style: TextStyle(
               color: isDarkChrome ? AppTheme.muted(context) : const Color(0xFF667781),
               fontSize: 13,
@@ -124,7 +129,90 @@ class AppearanceScreen extends ConsumerWidget {
               );
             }).toList(),
           ),
+          const SizedBox(height: 12),
+          _PhoneWallpaperTile(
+            selected: appearance.wallpaperId == 'custom',
+            preview: appearance.customWallpaperPath,
+            onPick: () => _pickPhoneWallpaper(context, notifier),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+Future<void> _pickPhoneWallpaper(BuildContext context, AppearanceNotifier notifier) async {
+  final file = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 1600,
+    imageQuality: 72,
+  );
+  if (file == null) return;
+  var bytes = await file.readAsBytes();
+  final decoded = img.decodeImage(bytes);
+  if (decoded != null) {
+    final resized = decoded.width > 1280 ? img.copyResize(decoded, width: 1280) : decoded;
+    bytes = Uint8List.fromList(img.encodeJpg(resized, quality: 70));
+  }
+  if (bytes.length > 900000) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That photo is too large. Try a smaller one.')),
+      );
+    }
+    return;
+  }
+  await notifier.setCustomWallpaper('b64:${base64Encode(bytes)}');
+}
+
+class _PhoneWallpaperTile extends StatelessWidget {
+  const _PhoneWallpaperTile({
+    required this.selected,
+    required this.preview,
+    required this.onPick,
+  });
+
+  final bool selected;
+  final String? preview;
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    Uint8List? bytes;
+    if (preview != null && preview!.startsWith('b64:')) {
+      try {
+        bytes = base64Decode(preview!.substring(4));
+      } catch (_) {
+        bytes = null;
+      }
+    }
+    return Material(
+      color: Theme.of(context).brightness == Brightness.dark
+          ? AppTheme.messengerElevated
+          : const Color(0xFFF0F2F5),
+      borderRadius: BorderRadius.circular(14),
+      child: ListTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: selected ? AppTheme.accentGreen : Colors.transparent, width: 2),
+        ),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: bytes == null
+                ? const ColoredBox(
+                    color: Color(0xFF1A2E24),
+                    child: Icon(Icons.photo_library_outlined, color: AppTheme.accentGreen),
+                  )
+                : Image.memory(bytes, fit: BoxFit.cover),
+          ),
+        ),
+        title: const Text('From this phone'),
+        subtitle: const Text('Use a photo saved on this phone'),
+        trailing: selected ? const Icon(Icons.check_circle, color: AppTheme.accentGreen) : null,
+        onTap: onPick,
       ),
     );
   }

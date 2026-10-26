@@ -100,6 +100,7 @@ class ChatMediaGrid extends StatelessWidget {
         imageUrl: msg.mediaUrl,
         width: width,
         height: height,
+        crop: true,
       ),
     );
   }

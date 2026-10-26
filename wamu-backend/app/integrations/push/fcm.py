@@ -42,12 +42,41 @@ class MockPushProvider:
         return {"status": "mock", "token_prefix": token[:12]}
 
 
+def build_fcm_payload(
+    *,
+    token: str,
+    title: str,
+    body: str,
+    data: dict[str, str],
+) -> dict:
+    """OS-visible notification plus data so a tap can open the conversation.
+
+    Title and body stay generic. Message text never goes in this payload.
+    """
+    return {
+        "to": token,
+        "priority": "high",
+        "content_available": True,
+        "notification": {
+            "title": title,
+            "body": body,
+            "sound": "default",
+        },
+        "data": {
+            **{k: str(v) for k, v in data.items()},
+            "title": title,
+            "body": body,
+        },
+    }
+
+
 class FcmLegacyPushProvider:
     """
-    FCM HTTP legacy (server key) — data-only messages.
+    FCM HTTP legacy (server key).
 
-    Prefer migrating to HTTP v1 when a service account is available; this path
-    is enough for staging with a Firebase cloud messaging server key.
+    The notification block is a generic label so Android can show it when Wamu
+    is in the background or closed. The data block carries the conversation id.
+    Prefer HTTP v1 when a service account is available.
     """
 
     def __init__(self, server_key: str) -> None:
@@ -61,18 +90,7 @@ class FcmLegacyPushProvider:
         body: str,
         data: dict[str, str],
     ) -> dict:
-        # Intentionally omit top-level "notification" so FCM stays data-only.
-        # Clients show a generic local notification from `data`.
-        payload = {
-            "to": token,
-            "priority": "high",
-            "content_available": True,
-            "data": {
-                **{k: str(v) for k, v in data.items()},
-                "title": title,
-                "body": body,
-            },
-        }
+        payload = build_fcm_payload(token=token, title=title, body=body, data=data)
         async with httpx.AsyncClient(timeout=15.0) as client:
             res = await client.post(
                 "https://fcm.googleapis.com/fcm/send",

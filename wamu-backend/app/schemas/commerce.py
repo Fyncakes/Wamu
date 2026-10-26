@@ -237,6 +237,8 @@ class MessageResponse(BaseModel):
     client_message_id: str | None = None
     status: str
     created_at: datetime
+    delivered_at: datetime | None = None
+    read_at: datetime | None = None
     reactions: dict[str, int] = Field(default_factory=dict)
     reply_to_message_id: UUID | None = None
     reply_to: MessageReplyPreview | None = None
