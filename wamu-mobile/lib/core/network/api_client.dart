@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server_config.dart';
 import '../storage/secure_storage.dart';
+import 'dio_http_adapter.dart';
 
 /// HTTP client wrapper around Dio with auth header injection + silent refresh.
 ///
@@ -63,6 +64,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
     ),
   );
+  configureWamuDioAdapter(dio);
 
   // Queued so concurrent 401s share one refresh instead of racing rotations.
   dio.interceptors.add(
