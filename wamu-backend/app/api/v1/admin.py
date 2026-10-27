@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -189,6 +189,24 @@ async def admin_activate_user(
 
     user = await trust_service.admin_set_user_status(db, admin, user_id, "ACTIVE")
     return UserResponse.model_validate(user)
+
+
+class AdminDeleteUserBody(BaseModel):
+    confirm: str = Field(description='Type DELETE to permanently remove this account')
+
+
+@router.post("/users/{user_id}/delete")
+async def admin_delete_user(
+    user_id: UUID,
+    body: AdminDeleteUserBody,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import account as account_service
+
+    if (body.confirm or "").strip().upper() != "DELETE":
+        raise HTTPException(status_code=400, detail='Type DELETE to confirm')
+    return await account_service.admin_delete_user(db, admin, user_id)
 
 
 @router.get("/users")

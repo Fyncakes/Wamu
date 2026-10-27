@@ -95,6 +95,18 @@ class AdminRepository {
   Future<void> verifyBusiness(String id) async {
     await _client.post('/admin/businesses/$id/verify');
   }
+
+  Future<void> suspendUser(String id) async {
+    await _client.post('/admin/users/$id/suspend');
+  }
+
+  Future<void> activateUser(String id) async {
+    await _client.post('/admin/users/$id/activate');
+  }
+
+  Future<void> deleteUser(String id) async {
+    await _client.post('/admin/users/$id/delete', data: {'confirm': 'DELETE'});
+  }
 }
 
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {

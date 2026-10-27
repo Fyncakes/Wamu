@@ -32,7 +32,7 @@ export default function UsersPage() {
   async function toggleStatus(user: User) {
     setBusyId(user.id);
     try {
-      if (user.status === "SUSPENDED") {
+      if (user.status === "SUSPENDED" || user.status === "DEACTIVATED") {
         await api.admin.activateUser(user.id);
       } else {
         await api.admin.suspendUser(user.id);
@@ -41,6 +41,25 @@ export default function UsersPage() {
     } catch (e) {
       console.error(e);
       alert(e instanceof Error ? e.message : "Failed to update user");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteUser(user: User) {
+    const ok = window.confirm(
+      `Delete ${displayName(user)}? Their personal data leaves Wamu. Type OK only if you mean it.`,
+    );
+    if (!ok) return;
+    const typed = window.prompt('Type DELETE to permanently remove this account');
+    if ((typed || "").trim().toUpperCase() !== "DELETE") return;
+    setBusyId(user.id);
+    try {
+      await api.admin.deleteUser(user.id);
+      setTick((t) => t + 1);
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : "Failed to delete user");
     } finally {
       setBusyId(null);
     }
@@ -106,16 +125,31 @@ export default function UsersPage() {
           {
             key: "actions",
             header: "Actions",
-            render: (u) => (
-              <button
-                type="button"
-                disabled={busyId === u.id}
-                onClick={() => toggleStatus(u)}
-                className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {u.status === "SUSPENDED" ? "Activate" : "Suspend"}
-              </button>
-            ),
+            render: (u) =>
+              u.status === "DELETED" ? (
+                <span className="text-xs text-slate-400">Removed</span>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busyId === u.id}
+                    onClick={() => toggleStatus(u)}
+                    className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {u.status === "SUSPENDED" || u.status === "DEACTIVATED"
+                      ? "Activate"
+                      : "Suspend"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === u.id}
+                    onClick={() => deleteUser(u)}
+                    className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ),
           },
         ]}
       />

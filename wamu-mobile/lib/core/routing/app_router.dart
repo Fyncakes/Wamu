@@ -40,6 +40,7 @@ import '../../features/profile/appearance_screen.dart';
 import '../../features/profile/customer_dashboard_screen.dart';
 import '../../features/profile/favorites_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
+import '../../features/profile/account_lifecycle_screen.dart';
 import '../../features/profile/help_screen.dart';
 import '../../features/profile/notification_settings_screen.dart';
 import '../../features/profile/notifications_screen.dart';
@@ -201,6 +202,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
       GoRoute(path: '/storage-data', builder: (_, __) => const StorageDataScreen()),
       GoRoute(path: '/help', builder: (_, __) => const HelpScreen()),
+      GoRoute(path: '/account', builder: (_, __) => const AccountLifecycleScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(path: '/account-qr', builder: (_, __) => const AccountQrScreen()),
       GoRoute(path: '/favorites', builder: (_, __) => const FavoritesScreen()),

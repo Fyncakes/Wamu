@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -9,9 +10,14 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.auth import PrivacyUpdate, UserProfileUpdate, UserResponse
+from app.services import account as account_service
 from app.services import trust as trust_service
 
 router = APIRouter()
+
+
+class AccountDeleteBody(BaseModel):
+    confirm: str = Field(description='Type DELETE to permanently remove this account')
 
 
 def _safe_avatar(url: str | None) -> str | None:
@@ -76,6 +82,28 @@ async def update_privacy(
     await db.flush()
     await db.refresh(user)
     return user
+
+
+@router.post("/me/deactivate", response_model=dict)
+async def deactivate_me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pause the account. Sign in again with OTP to turn it back on."""
+    await account_service.deactivate_own_account(db, user)
+    return {"status": "deactivated"}
+
+
+@router.post("/me/delete", response_model=dict)
+async def delete_me(
+    body: AccountDeleteBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently remove personal data from Wamu. Orders/payments stay for the ledger."""
+    if (body.confirm or "").strip().upper() != "DELETE":
+        raise HTTPException(status_code=400, detail='Type DELETE to confirm')
+    return await account_service.delete_own_account(db, user)
 
 
 @router.get("/me/blocks", response_model=list[UserResponse])

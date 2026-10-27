@@ -199,7 +199,7 @@ class _AdminHubScreenState extends ConsumerState<AdminHubScreen>
             controller: _tabs!,
             children: [
               _OverviewTab(stats: data.stats, onOpenWeb: _openFullWebAdmin),
-              _UsersTab(users: data.users),
+              _UsersTab(users: data.users, onChanged: _reload),
               _RidersTab(riders: data.riders, onChanged: _reload),
               _ShopsTab(businesses: data.businesses, onChanged: _reload),
               _LiveListTab(
@@ -326,10 +326,11 @@ class _OverviewTab extends StatelessWidget {
   }
 }
 
-class _UsersTab extends StatelessWidget {
-  const _UsersTab({required this.users});
+class _UsersTab extends ConsumerWidget {
+  const _UsersTab({required this.users, required this.onChanged});
 
   final List<Map<String, dynamic>> users;
+  final VoidCallback onChanged;
 
   String _name(Map<String, dynamic> u) {
     final profile = u['profile'];
@@ -344,8 +345,52 @@ class _UsersTab extends StatelessWidget {
     return u['phone']?.toString() ?? 'User';
   }
 
+  Future<void> _act(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> u,
+    String action,
+  ) async {
+    final id = u['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final repo = ref.read(adminRepositoryProvider);
+    try {
+      if (action == 'suspend') {
+        await repo.suspendUser(id);
+      } else if (action == 'activate') {
+        await repo.activateUser(id);
+      } else if (action == 'delete') {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete this user?'),
+            content: Text(
+              'Removes ${_name(u)} personal data from Wamu. Type is confirmed as DELETE.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        await repo.deleteUser(id);
+      }
+      onChanged();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (users.isEmpty) {
       return const Center(child: Text('No users yet'));
     }
@@ -358,7 +403,8 @@ class _UsersTab extends StatelessWidget {
         final role = (u['role']?.toString() ?? 'CUSTOMER').toUpperCase();
         final email = u['email']?.toString();
         final phone = u['phone']?.toString() ?? '';
-        final status = u['status']?.toString() ?? '';
+        final status = (u['status']?.toString() ?? '').toUpperCase();
+        final deleted = status == 'DELETED';
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: AppTheme.accentGreen.withValues(alpha: 0.2),
@@ -377,6 +423,21 @@ class _UsersTab extends StatelessWidget {
             ].join(' · '),
           ),
           isThreeLine: true,
+          trailing: deleted
+              ? null
+              : PopupMenuButton<String>(
+                  onSelected: (v) => _act(context, ref, u, v),
+                  itemBuilder: (_) => [
+                    if (status == 'SUSPENDED' || status == 'DEACTIVATED')
+                      const PopupMenuItem(value: 'activate', child: Text('Activate')),
+                    if (status == 'ACTIVE' || status == 'DEACTIVATED')
+                      const PopupMenuItem(value: 'suspend', child: Text('Suspend')),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete account', style: TextStyle(color: Colors.redAccent)),
+                    ),
+                  ],
+                ),
         );
       },
     );

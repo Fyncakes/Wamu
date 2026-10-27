@@ -300,8 +300,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _YouTile(
                   icon: Icons.key_outlined,
                   title: 'Account',
-                  subtitle: 'Name, photo, about',
-                  onTap: () => context.push('/edit-profile'),
+                  subtitle: 'Profile, deactivate, or delete',
+                  onTap: () => context.push('/account'),
                 ),
                 _YouTile(
                   icon: Icons.qr_code_2,

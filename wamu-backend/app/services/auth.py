@@ -115,6 +115,9 @@ async def verify_otp(
     else:
         user.phone_verified = True
     _grant_permanent_admin(user)
+    from app.services import account as account_service
+
+    await account_service.apply_login_status_rules(db, user)
 
     return await issue_session(
         db,
@@ -186,6 +189,8 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenResponse:
 
     user = session.user
     _grant_permanent_admin(user)
+    if user.status != "ACTIVE":
+        raise HTTPException(status_code=401, detail="User inactive")
     # Rotate refresh token
     session.revoked_at = datetime.now(timezone.utc)
     new_refresh = generate_refresh_token()

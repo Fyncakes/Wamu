@@ -328,6 +328,12 @@ export const api = {
     activateUser: (id: string) =>
       request<User>(`/admin/users/${id}/activate`, { method: "POST" }),
 
+    deleteUser: (id: string) =>
+      request<{ status: string; user_id: string }>(`/admin/users/${id}/delete`, {
+        method: "POST",
+        body: JSON.stringify({ confirm: "DELETE" }),
+      }),
+
     suspendBusiness: (id: string) =>
       request<Business>(`/admin/businesses/${id}/suspend`, { method: "POST" }),
 

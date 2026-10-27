@@ -17,6 +17,7 @@ from app.models.mixins import TimestampMixin, UUIDMixin
 class UserStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     SUSPENDED = "SUSPENDED"
+    DEACTIVATED = "DEACTIVATED"
     DELETED = "DELETED"
 
 
