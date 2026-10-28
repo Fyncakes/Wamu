@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/media_url.dart';
 import '../../core/network/api_error.dart';
+import '../../core/network/dio_http_adapter.dart';
 import '../../core/server_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/discover_video_model.dart';
@@ -19,6 +20,7 @@ import '../../shared/widgets/loading_view.dart';
 import '../../shared/widgets/wamu_network_image.dart';
 import '../chat/chat_repository.dart';
 import 'discover_repository.dart';
+import 'discover_video_cache.dart';
 import 'html_video_pointer_stub.dart'
     if (dart.library.js_interop) 'html_video_pointer_web.dart';
 import 'videos_feed_visibility.dart';
@@ -748,17 +750,31 @@ class _VideoPageState extends State<_VideoPage>
       }
       return;
     }
-    final c = VideoPlayerController.networkUrl(
-      uri,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-      httpHeaders: const {
-        // Help mobile Chrome fetch ranged MP4s through the tunnel.
-        'Accept': '*/*',
-      },
-    );
-    _controller = c;
+
+    VideoPlayerController? c;
+    var playedFromFile = false;
     try {
-      await c.initialize().timeout(const Duration(seconds: 60));
+      // Railway host often fails native ExoPlayer DNS on phone hotspots.
+      // Download through Dio (HttpOverrides / DoH) and play the local file.
+      if (shouldPrefetchDiscoverVideo(uri)) {
+        final cached = await openCachedDiscoverVideo(
+          url: url,
+          videoId: widget.video.id,
+        );
+        if (cached != null) {
+          c = cached;
+          playedFromFile = true;
+        }
+      }
+      c ??= VideoPlayerController.networkUrl(
+        uri,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        httpHeaders: const {
+          'Accept': '*/*',
+        },
+      );
+      _controller = c;
+      await c.initialize().timeout(const Duration(seconds: 90));
       // No infinite loop — rotate to the next clip when this one ends / dwells.
       await c.setLooping(false);
       await c.setVolume(_muted ? 0 : 1);
@@ -775,11 +791,43 @@ class _VideoPageState extends State<_VideoPage>
         if (mounted) _syncPlayback();
       });
     } catch (e) {
-      await c.dispose();
-      if (_controller == c) _controller = null;
+      final failed = c;
+      if (failed != null) {
+        await failed.dispose();
+        if (_controller == failed) _controller = null;
+      }
+      // Last chance: force Dio download even if host was not flagged.
+      if (!playedFromFile) {
+        try {
+          final local = await openCachedDiscoverVideo(
+            url: url,
+            videoId: widget.video.id,
+          );
+          if (local != null && mounted) {
+            _controller = local;
+            await local.initialize().timeout(const Duration(seconds: 60));
+            await local.setLooping(false);
+            await local.setVolume(_muted ? 0 : 1);
+            if (!mounted) return;
+            setState(() {
+              _ready = true;
+              _loadFailed = false;
+              _loadError = null;
+              _opening = false;
+            });
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              disableHtmlVideoPointerEvents();
+              if (mounted) _syncPlayback();
+            });
+            return;
+          }
+        } catch (_) {}
+      }
       var message = 'Video failed to load — tap to retry';
       try {
-        final probe = await Dio().head<void>(
+        final probeDio = Dio();
+        configureWamuDioAdapter(probeDio);
+        final probe = await probeDio.head<void>(
           url,
           options: Options(
             followRedirects: true,
@@ -789,6 +837,7 @@ class _VideoPageState extends State<_VideoPage>
             headers: const {'Accept-Encoding': 'identity'},
           ),
         );
+        probeDio.close(force: true);
         final code = probe.statusCode ?? 0;
         if (code == 404 || code == 410) {
           message = 'This clip is no longer on the server. Upload it again from your shop.';

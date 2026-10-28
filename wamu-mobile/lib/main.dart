@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/network/wamu_http_overrides.dart';
+import 'core/notifications/local_notifications.dart';
 import 'core/push/push_registration_provider.dart';
 import 'core/routing/app_router.dart';
 import 'core/server_config.dart';
@@ -15,6 +16,7 @@ import 'features/chat/outbox_flush_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installWamuHttpOverrides();
+  await ensureLocalNotificationsReady();
   final storage = SecureStorageService();
   await ServerConfig.hydrate(storage);
   runApp(const ProviderScope(child: WamuApp()));

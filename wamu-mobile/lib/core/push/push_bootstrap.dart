@@ -5,11 +5,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:flutter/material.dart';
-
 import '../../firebase_options.dart';
 import '../../features/profile/commerce_notif_provider.dart';
-import '../routing/app_router.dart';
+import '../notifications/local_notifications.dart';
 import '../storage/secure_storage.dart';
 import 'chat_focus.dart';
 import 'push_token_repository.dart';
@@ -55,8 +53,10 @@ class PushBootstrap {
     if (!ready) return;
 
     try {
+      await ensureLocalNotificationsReady();
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);
+      // Android 13+: also ask via the notifications plugin channel.
       final token = await messaging.getToken();
       if (token == null || token.isEmpty) return;
       await registerPushTokenIfSupported(_ref, token: token);
@@ -81,6 +81,7 @@ class PushBootstrap {
 
     _foregroundSub?.cancel();
     _foregroundSub = FirebaseMessaging.onMessage.listen((message) {
+      unawaited(_showForegroundBanner(message));
       if (_isChatPush(message)) {
         _onChatPush(message, tapped: false);
       } else {
@@ -124,6 +125,23 @@ class PushBootstrap {
     }
   }
 
+  Future<void> _showForegroundBanner(RemoteMessage message) async {
+    final title = message.notification?.title ??
+        message.data['title']?.toString() ??
+        'Wamu';
+    final body = message.notification?.body ??
+        message.data['body']?.toString() ??
+        (_isChatPush(message) ? _chatLabel(message) : 'New update');
+    final open = _ref.read(openChatIdProvider);
+    final convo = message.data['conversation_id'] ?? '';
+    if (convo.isNotEmpty && open == convo) return;
+    await showWamuLocalNotification(
+      title: title,
+      body: body,
+      payload: convo.isEmpty ? null : 'chat:$convo',
+    );
+  }
+
   void _onChatPush(RemoteMessage message, {required bool tapped}) {
     final id = message.data['conversation_id'] ?? '';
     if (id.isEmpty) return;
@@ -133,20 +151,6 @@ class PushBootstrap {
     }
     final open = _ref.read(openChatIdProvider);
     if (open == id) return;
-    final context = _ref.read(appRouterProvider).routerDelegate.navigatorKey.currentContext;
-    if (context == null) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      SnackBar(
-        content: Text(_chatLabel(message)),
-        action: SnackBarAction(
-          label: 'Open',
-          onPressed: () {
-            _ref.read(pendingChatOpenProvider.notifier).state = id;
-          },
-        ),
-      ),
-    );
   }
 
   Future<void> _refreshCommerceInbox() async {

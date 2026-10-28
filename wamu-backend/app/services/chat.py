@@ -59,16 +59,26 @@ def _enqueue_message_pushes(
                 continue
             if getattr(member, "muted", False):
                 continue
-            send_push_notification.delay(
-                str(member.user_id),
-                "Wamu",
-                label,
-                {
-                    "type": "NEW_MESSAGE",
-                    "conversation_id": str(conversation_id),
-                    "message_kind": kind,
-                },
-            )
+            payload = {
+                "type": "NEW_MESSAGE",
+                "conversation_id": str(conversation_id),
+                "message_kind": kind,
+            }
+            try:
+                send_push_notification.delay(
+                    str(member.user_id),
+                    "Wamu",
+                    label,
+                    payload,
+                )
+            except Exception:
+                # Broker down — still try a direct send so phones wake when FCM is configured.
+                send_push_notification(
+                    str(member.user_id),
+                    "Wamu",
+                    label,
+                    payload,
+                )
     except Exception as exc:
         # Redis/Celery often down in local demo — don't dump full traceback every message.
         broker_down = False

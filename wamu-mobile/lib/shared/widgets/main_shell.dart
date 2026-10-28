@@ -10,6 +10,7 @@ import '../../features/cart/cart_provider.dart';
 import '../../features/chat/inbox_snapshot_provider.dart';
 import '../../features/discover/videos_feed_visibility.dart';
 import '../../features/profile/commerce_notif_provider.dart';
+import '../../core/notifications/local_notifications.dart';
 import '../../core/notifications/notification_sound_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/notification_settings_provider.dart';
@@ -62,6 +63,14 @@ class _MainShellState extends ConsumerState<MainShell> {
       if (!prefs.messageAlerts) return;
       final who = next.latestName ?? 'Someone';
       final preview = (next.latestPreview ?? 'New message').trim();
+      // OS heads-up while the app is open (FCM alone stays silent in foreground).
+      unawaited(
+        showWamuLocalNotification(
+          title: who,
+          body: preview.isEmpty ? 'New message' : preview,
+          payload: 'chats',
+        ),
+      );
       final messenger = ScaffoldMessenger.of(context);
       messenger.clearSnackBars();
       messenger.showSnackBar(
