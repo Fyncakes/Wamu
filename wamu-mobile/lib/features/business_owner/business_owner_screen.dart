@@ -928,6 +928,7 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                     horizontal: 12,
                                     vertical: 8,
                                   ),
+                                  onTap: () => _showEditor(existing: product),
                                   leading: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: SizedBox(
@@ -940,33 +941,51 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                   subtitle: Text(
                                     '${formatUgx(product.price)} · '
                                     'stock ${product.stockQuantity ?? '—'} · '
-                                    '${product.status}',
+                                    '${product.status}\n'
+                                    'Tap to edit',
                                   ),
                                   isThreeLine: true,
-                                  trailing: PopupMenuButton<String>(
-                                    onSelected: (value) async {
-                                      switch (value) {
-                                        case 'edit':
-                                          await _showEditor(existing: product);
-                                        case 'photo':
-                                          await _pickAndUploadImage(product);
-                                        case 'oos':
-                                          await ref
-                                              .read(ownerProductsRepositoryProvider)
-                                              .updateProduct(
-                                                productId: product.id,
-                                                status: 'OUT_OF_STOCK',
-                                                stockQuantity: 0,
-                                              );
-                                          await _reloadProducts();
-                                      }
-                                    },
-                                    itemBuilder: (_) => const [
-                                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                      PopupMenuItem(value: 'photo', child: Text('Add photo')),
-                                      PopupMenuItem(
-                                        value: 'oos',
-                                        child: Text('Mark out of stock'),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'Edit product',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () =>
+                                            _showEditor(existing: product),
+                                      ),
+                                      PopupMenuButton<String>(
+                                        onSelected: (value) async {
+                                          switch (value) {
+                                            case 'edit':
+                                              await _showEditor(existing: product);
+                                            case 'photo':
+                                              await _pickAndUploadImage(product);
+                                            case 'oos':
+                                              await ref
+                                                  .read(ownerProductsRepositoryProvider)
+                                                  .updateProduct(
+                                                    productId: product.id,
+                                                    status: 'OUT_OF_STOCK',
+                                                    stockQuantity: 0,
+                                                  );
+                                              await _reloadProducts();
+                                          }
+                                        },
+                                        itemBuilder: (_) => const [
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            child: Text('Edit'),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'photo',
+                                            child: Text('Change photo'),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'oos',
+                                            child: Text('Mark out of stock'),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
