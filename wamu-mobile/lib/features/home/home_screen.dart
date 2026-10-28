@@ -28,7 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ({List<CategoryModel> categories, List<BusinessModel> nearby})? _lastData;
   Object? _loadError;
   String? _selectedCategoryId;
-  /// null = use GPS / auto; otherwise a Kampala area id.
+  /// null = use GPS / auto; otherwise a Uganda area id.
   String? _areaId;
   NearbyOrigin _origin = const NearbyOrigin(
     label: 'Greater Kampala',

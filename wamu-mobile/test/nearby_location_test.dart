@@ -14,7 +14,10 @@ void main() {
     expect(fallback.radiusKm, 20);
   });
 
-  test('kampalaAreas covers beachhead set', () {
-    expect(kampalaAreas.map((a) => a.id), containsAll(['kampala', 'ntinda', 'nakawa']));
+  test('ugandaAreas covers Kampala beachhead and regions', () {
+    final ids = ugandaAreas.map((a) => a.id).toSet();
+    expect(ids, containsAll(['kampala', 'ntinda', 'nakawa', 'wandegeya']));
+    expect(ids, containsAll(['jinja', 'gulu', 'mbarara', 'mbale', 'arua', 'moroto']));
+    expect(ugandaAreas.length, greaterThan(100));
   });
 }
