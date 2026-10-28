@@ -70,3 +70,15 @@ def test_external_image_url_stays(monkeypatch, tmp_path):
     assert servable_media_url(url) == url
     assert servable_media_url("  ") is None
     assert servable_media_url(None) is None
+
+
+def test_demo_seed_food_images_are_never_served(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_ROOT", str(tmp_path))
+    folder = tmp_path / "seed" / "shops"
+    folder.mkdir(parents=True)
+    (folder / "food_logo.jpg").write_bytes(b"demo")
+    seed = "/media-files/seed/shops/food_logo.jpg"
+    assert servable_media_url(seed) is None
+    assert servable_media_url(
+        "https://wamu-production.up.railway.app/media-files/seed/shops/food_cover.jpg"
+    ) is None

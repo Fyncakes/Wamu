@@ -38,7 +38,13 @@ async def list_products(
     rows, _ = await product_service.list_products(
         db, business_id=business_id, page=page, page_size=page_size
     )
-    return [_public_product(row) for row in rows]
+    # Drop listings whose photo file is gone or was only a demo/seed asset.
+    out = []
+    for row in rows:
+        body = _public_product(row)
+        if body.images:
+            out.append(body)
+    return out
 
 
 @router.post("/business/{business_id}", response_model=ProductResponse, status_code=201)

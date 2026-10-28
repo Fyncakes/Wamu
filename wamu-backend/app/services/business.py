@@ -36,15 +36,7 @@ async def create_business(db: AsyncSession, user: User, data: BusinessCreate) ->
         i += 1
         slug = f"{base_slug}-{i}"
 
-    # Default shop media so VERIFIED merchants appear in the public catalog
-    # even before they upload a custom logo (customer list requires logo/cover).
-    name_l = (data.name or "").lower()
-    if any(k in name_l for k in ("cake", "bakery", "pastry", "dessert")):
-        default_logo = "/media-files/seed/shops/bakery_logo.jpg"
-        default_cover = "/media-files/seed/shops/bakery_cover.jpg"
-    else:
-        default_logo = "/media-files/seed/shops/food_logo.jpg"
-        default_cover = "/media-files/seed/shops/food_cover.jpg"
+    # No demo/seed food logos — shops appear once the owner uploads real photos.
     business = Business(
         owner_id=user.id,
         name=data.name,
@@ -56,8 +48,8 @@ async def create_business(db: AsyncSession, user: User, data: BusinessCreate) ->
         email=data.email,
         category_id=data.category_id,
         verification_status=VerificationStatus.UNVERIFIED.value,
-        logo_url=default_logo,
-        cover_url=default_cover,
+        logo_url=None,
+        cover_url=None,
     )
     db.add(business)
     await db.flush()
@@ -117,21 +109,63 @@ async def create_business(db: AsyncSession, user: User, data: BusinessCreate) ->
 
 
 async def _repair_shop_logos(db: AsyncSession, businesses: list[Business]) -> None:
-    """Point a missing seed logo at a photo the owner already uploaded."""
-    pending = [b for b in businesses if not live_shop_image(b.logo_url)]
-    if not pending:
-        return
-    owner_ids = {b.owner_id for b in pending}
-    rows = await db.execute(select(UserProfile).where(UserProfile.user_id.in_(owner_ids)))
-    avatars = {profile.user_id: profile.avatar_url for profile in rows.scalars()}
+    """Drop demo seed URLs and point logos at a real photo the owner uploaded."""
+    from app.core.media_root import is_demo_seed_url
+    from app.models.product import Product
+    from app.services.product import newest_servable_image
+
     changed = False
+    for business in businesses:
+        if is_demo_seed_url(business.logo_url):
+            business.logo_url = None
+            changed = True
+        if is_demo_seed_url(business.cover_url):
+            business.cover_url = None
+            changed = True
+
+    pending = [b for b in businesses if not live_shop_image(b.logo_url)]
+    if not pending and not changed:
+        return
+
+    owner_ids = {b.owner_id for b in pending} if pending else set()
+    avatars: dict = {}
+    if owner_ids:
+        rows = await db.execute(select(UserProfile).where(UserProfile.user_id.in_(owner_ids)))
+        avatars = {profile.user_id: profile.avatar_url for profile in rows.scalars()}
+
+    product_fallback: dict = {}
+    if pending:
+        biz_ids = [b.id for b in pending]
+        prod_rows = (
+            await db.execute(
+                select(Product)
+                .options(selectinload(Product.images))
+                .where(
+                    Product.business_id.in_(biz_ids),
+                    Product.deleted_at.is_(None),
+                    Product.is_active.is_(True),
+                )
+            )
+        ).scalars().all()
+        for product in prod_rows:
+            if product.business_id in product_fallback:
+                continue
+            chosen_img = newest_servable_image(product.images)
+            if chosen_img and chosen_img.url:
+                product_fallback[product.business_id] = chosen_img.url
+
     for business in pending:
         cover = business.cover_url if live_shop_image(business.cover_url) else None
         avatar = avatars.get(business.owner_id)
         avatar = avatar if live_shop_image(avatar) else None
-        chosen = cover or avatar
+        product_photo = product_fallback.get(business.id)
+        product_photo = product_photo if live_shop_image(product_photo) else None
+        chosen = cover or product_photo or avatar
         if chosen and chosen != business.logo_url:
             business.logo_url = chosen
+            changed = True
+        if cover is None and product_photo and not live_shop_image(business.cover_url):
+            business.cover_url = product_photo
             changed = True
     if changed:
         await db.flush()
@@ -203,9 +237,18 @@ async def list_businesses(
     radius_km: float | None = None,
 ) -> tuple[list[Business], int]:
     page_size = min(max(page_size, 1), 100)
+    # Real uploads only — never treat /seed/ demo food images as catalog media.
     media_ok = or_(
-        (Business.logo_url.is_not(None) & (Business.logo_url != "")),
-        (Business.cover_url.is_not(None) & (Business.cover_url != "")),
+        (
+            Business.logo_url.is_not(None)
+            & (Business.logo_url != "")
+            & (~Business.logo_url.contains("/seed/"))
+        ),
+        (
+            Business.cover_url.is_not(None)
+            & (Business.cover_url != "")
+            & (~Business.cover_url.contains("/seed/"))
+        ),
     )
     stmt = select(Business).options(selectinload(Business.location)).where(
         Business.deleted_at.is_(None),

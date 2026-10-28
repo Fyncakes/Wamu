@@ -333,6 +333,33 @@ async def bootstrap() -> None:
     except Exception:
         logger.exception("Demo image seed skipped")
 
+    # Strip leftover demo food/shop seed URLs so buyers only see real uploads.
+    try:
+        n = await _strip_demo_seed_media()
+        if n:
+            logger.info("Cleared demo seed media from %s shop fields", n)
+    except Exception:
+        logger.exception("Demo seed media cleanup skipped")
+
+
+async def _strip_demo_seed_media() -> int:
+    """Remove /seed/ logo & cover URLs (demo food images) from live shops."""
+    from app.models.business import Business
+
+    cleared = 0
+    async with AsyncSessionLocal() as db:
+        shops = (await db.scalars(select(Business).where(Business.deleted_at.is_(None)))).all()
+        for shop in shops:
+            if shop.logo_url and "/seed/" in shop.logo_url:
+                shop.logo_url = None
+                cleared += 1
+            if shop.cover_url and "/seed/" in shop.cover_url:
+                shop.cover_url = None
+                cleared += 1
+        if cleared:
+            await db.commit()
+    return cleared
+
 
 async def _ensure_admin(db) -> None:
     from app.core.admins import PERMANENT_ADMIN_PHONES

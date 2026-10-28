@@ -604,7 +604,7 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                           existingImageUrl,
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => const Center(
-                                        child: Icon(Icons.cake_outlined, size: 40),
+                                        child: Icon(Icons.image_outlined, size: 40),
                                       ),
                                     )
                                   : const Center(

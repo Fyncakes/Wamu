@@ -8,10 +8,12 @@ import 'server_config.dart';
 String? resolveMediaUrl(String? url) {
   if (url == null || url.isEmpty) return url;
 
+  final trimmed = url.trim();
+  // Never show bundled demo/seed food images as real shop or product media.
+  if (trimmed.contains('/seed/')) return null;
+
   final origin = Uri.tryParse(ServerConfig.mediaOrigin);
   if (origin == null || origin.host.isEmpty) return url;
-
-  final trimmed = url.trim();
 
   // Relative /media-files/... paths
   if (!trimmed.contains('://')) {

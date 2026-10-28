@@ -112,13 +112,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         lng: origin.lng,
         radiusKm: origin.radiusKm,
       );
-      // Hide listings with no imagery (broken / unregistered media).
+      // Hide listings with no real imagery (and never show demo /seed/ food art).
+      bool hasLivePhoto(String? url) {
+        final u = (url ?? '').trim();
+        return u.isNotEmpty && !u.contains('/seed/');
+      }
+
       final nearby = nearbyRaw
-          .where(
-            (b) =>
-                (b.imageUrl ?? '').trim().isNotEmpty ||
-                (b.coverUrl ?? '').trim().isNotEmpty,
-          )
+          .where((b) => hasLivePhoto(b.imageUrl) || hasLivePhoto(b.coverUrl))
           .toList();
       final data = (categories: categories, nearby: nearby);
       if (!mounted) return;
