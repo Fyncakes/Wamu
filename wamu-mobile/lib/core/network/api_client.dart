@@ -126,8 +126,14 @@ final apiClientProvider = Provider<ApiClient>((ref) {
           opts.headers['Authorization'] = 'Bearer $access';
           final retry = await dio.fetch(opts);
           return handler.resolve(retry);
+        } on DioException catch (refreshErr) {
+          // Offline / tunnel blips must not wipe a still-valid refresh token.
+          final code = refreshErr.response?.statusCode;
+          if (code == 401 || code == 403) {
+            await storage.clearAuth();
+          }
+          return handler.next(error);
         } catch (_) {
-          await storage.clearAuth();
           return handler.next(error);
         }
       },

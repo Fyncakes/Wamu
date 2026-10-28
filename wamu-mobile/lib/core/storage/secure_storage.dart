@@ -26,6 +26,7 @@ class SecureStorageService {
   static const _refreshKey = 'refresh_token';
   static const _userIdKey = 'user_id';
   static const _phoneKey = 'phone';
+  static const _userSnapshotKey = 'user_snapshot';
 
   Future<void> _prefsWrite(String key, String value) async {
     final prefs = await SharedPreferences.getInstance();
@@ -92,6 +93,9 @@ class SecureStorageService {
   Future<void> savePhone(String phone) => _write(_phoneKey, phone);
   Future<String?> getPhone() => _read(_phoneKey);
 
+  Future<void> saveUserSnapshot(String json) => _write(_userSnapshotKey, json);
+  Future<String?> getUserSnapshot() => _read(_userSnapshotKey);
+
   /// Generic key-value helpers (cart persistence, etc.).
   Future<void> write(String key, String value) => _write(key, value);
   Future<String?> read(String key) => _read(key);
@@ -102,6 +106,7 @@ class SecureStorageService {
     await _delete(_refreshKey);
     await _delete(_userIdKey);
     await _delete(_phoneKey);
+    await _delete(_userSnapshotKey);
   }
 
   Future<void> clearAll() async {

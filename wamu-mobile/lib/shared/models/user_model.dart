@@ -70,10 +70,19 @@ class UserModel {
   Map<String, dynamic> toJson() => {
         'id': id,
         'phone': phone,
-        'first_name': firstName,
-        'last_name': lastName,
         'email': email,
-        'avatar_url': avatarUrl,
         'role': role,
+        'profile': {
+          'first_name': firstName,
+          'last_name': lastName,
+          'avatar_url': avatarUrl,
+          'bio': bio,
+          'show_last_seen': showLastSeen,
+          'show_online': showOnline,
+          'show_read_receipts': showReadReceipts,
+          'wants_to_buy': wantsToBuy,
+          'owns_business': ownsBusiness,
+          'wants_to_ride': wantsToRide,
+        },
       };
 }

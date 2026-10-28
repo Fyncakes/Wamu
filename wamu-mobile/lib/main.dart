@@ -10,6 +10,7 @@ import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/appearance_provider.dart';
 import 'features/auth/auth_provider.dart';
+import 'features/auth/auth_reconnect_provider.dart';
 import 'features/chat/outbox_flush_provider.dart';
 
 /// WAMU Uganda Super App entry point.
@@ -28,6 +29,7 @@ class WamuApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(authProvider);
+    ref.watch(authReconnectProvider);
     ref.watch(serverConfigProvider);
     ref.watch(outboxFlushProvider);
     ref.watch(pushRegistrationProvider);
