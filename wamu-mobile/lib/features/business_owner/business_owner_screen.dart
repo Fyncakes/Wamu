@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/media_url.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/api_error.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/business_model.dart';
 import '../../shared/models/category_model.dart';
@@ -538,7 +539,7 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
     );
     var status = existing?.status ?? 'ACTIVE';
     final saving = ValueNotifier(false);
-    XFile? pickedImage;
+    Uint8List? pickedImageBytes;
     final existingImageUrl = existing?.imageUrl;
 
     final saved = await showModalBottomSheet<bool>(
@@ -563,7 +564,7 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                 if (file == null || !ctx.mounted) return;
                 final edited = await _positionPhoto(ctx, file);
                 if (edited == null) return;
-                setLocal(() => pickedImage = edited);
+                setLocal(() => pickedImageBytes = edited);
               }
 
               return SingleChildScrollView(
@@ -578,7 +579,7 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                     const SizedBox(height: 12),
                     Text(
                       existing == null
-                          ? 'Product photo (required)'
+                          ? 'Product photo (required for buyers to see it)'
                           : 'Product photo',
                       style: Theme.of(ctx).textTheme.titleSmall,
                     ),
@@ -591,20 +592,10 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                         clipBehavior: Clip.antiAlias,
                         child: InkWell(
                           onTap: () => pickPhoto(ImageSource.gallery),
-                          child: pickedImage != null
-                              ? FutureBuilder<Uint8List>(
-                                  future: pickedImage!.readAsBytes(),
-                                  builder: (context, snap) {
-                                    if (!snap.hasData) {
-                                      return const Center(
-                                        child: CircularProgressIndicator(),
-                                      );
-                                    }
-                                    return Image.memory(
-                                      snap.data!,
-                                      fit: BoxFit.cover,
-                                    );
-                                  },
+                          child: pickedImageBytes != null
+                              ? Image.memory(
+                                  pickedImageBytes!,
+                                  fit: BoxFit.cover,
                                 )
                               : (existingImageUrl != null &&
                                       existingImageUrl.isNotEmpty)
@@ -625,7 +616,7 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                           Text('Tap to upload product photo'),
                                           SizedBox(height: 4),
                                           Text(
-                                            'Required — cake, meal, or item photo',
+                                            'Required — buyers only see products with a photo',
                                             style: TextStyle(fontSize: 12),
                                           ),
                                         ],
@@ -711,7 +702,9 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                   );
                                   return;
                                 }
-                                if (existing == null && pickedImage == null) {
+                                if (existing == null &&
+                                    (pickedImageBytes == null ||
+                                        pickedImageBytes!.isEmpty)) {
                                   ScaffoldMessenger.of(ctx).showSnackBar(
                                     const SnackBar(
                                       content: Text(
@@ -726,16 +719,13 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                   final repo =
                                       ref.read(ownerProductsRepositoryProvider);
                                   if (existing == null) {
-                                    final created = await repo.createProduct(
+                                    await repo.createProductWithImage(
                                       businessId: _businessId!,
                                       name: name,
                                       price: price,
                                       description: desc,
                                       stockQuantity: stock,
-                                    );
-                                    await repo.uploadImage(
-                                      created.id,
-                                      pickedImage!,
+                                      imageBytes: pickedImageBytes!,
                                     );
                                   } else {
                                     await repo.updateProduct(
@@ -745,11 +735,13 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                       description: desc,
                                       stockQuantity: stock,
                                       status: status,
+                                      isActive: status == 'ACTIVE',
                                     );
-                                    if (pickedImage != null) {
-                                      await repo.uploadImage(
+                                    if (pickedImageBytes != null &&
+                                        pickedImageBytes!.isNotEmpty) {
+                                      await repo.uploadImageBytes(
                                         existing.id,
-                                        pickedImage!,
+                                        pickedImageBytes!,
                                       );
                                     }
                                   }
@@ -757,7 +749,9 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                                 } catch (e) {
                                   if (ctx.mounted) {
                                     ScaffoldMessenger.of(ctx).showSnackBar(
-                                      SnackBar(content: Text('$e')),
+                                      SnackBar(
+                                        content: Text(apiErrorMessage(e)),
+                                      ),
                                     );
                                   }
                                 } finally {
@@ -793,10 +787,23 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
     stockController.dispose();
     saving.dispose();
 
-    if (saved == true) await _reloadProducts();
+    if (saved == true) {
+      await _reloadProducts();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              existing == null
+                  ? 'Product is live — buyers can see it now'
+                  : 'Product updated',
+            ),
+          ),
+        );
+      }
+    }
   }
 
-  Future<XFile?> _positionPhoto(BuildContext context, XFile file) async {
+  Future<Uint8List?> _positionPhoto(BuildContext context, XFile file) async {
     final bytes = await file.readAsBytes();
     if (!context.mounted) return null;
     final edited = await showChatImageEditor(
@@ -805,12 +812,8 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
       showCaption: false,
       doneLabel: 'Use photo',
     );
-    if (edited == null) return null;
-    return XFile.fromData(
-      edited.bytes,
-      mimeType: 'image/jpeg',
-      name: 'wamu-product.jpg',
-    );
+    if (edited == null || edited.bytes.isEmpty) return null;
+    return edited.bytes;
   }
 
   Future<void> _pickAndUploadImage(ProductModel product) async {
@@ -826,16 +829,29 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
 
     setState(() => _loading = true);
     try {
-      await ref.read(ownerProductsRepositoryProvider).uploadImage(product.id, edited);
+      await ref.read(ownerProductsRepositoryProvider).uploadImageBytes(
+            product.id,
+            edited,
+          );
+      // Reactivate if a previous failed create left it hidden.
+      await ref.read(ownerProductsRepositoryProvider).updateProduct(
+            productId: product.id,
+            status: 'ACTIVE',
+            isActive: true,
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo uploaded')),
+          const SnackBar(
+            content: Text('Photo uploaded — buyers can see this product'),
+          ),
         );
       }
       await _reloadProducts();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(apiErrorMessage(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

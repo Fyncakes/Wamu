@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
@@ -64,6 +66,7 @@ class OwnerProductsRepository {
     String? description,
     int? stockQuantity,
     String? status,
+    bool? isActive,
   }) async {
     final response = await _client.patch(
       '/products/$productId',
@@ -73,40 +76,111 @@ class OwnerProductsRepository {
         if (description != null) 'description': description,
         if (stockQuantity != null) 'stock_quantity': stockQuantity,
         if (status != null) 'status': status,
+        if (isActive != null) 'is_active': isActive,
       },
     );
     return ProductModel.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Create the product then attach the photo. Buyers only see items with a photo.
+  Future<ProductModel> createProductWithImage({
+    required String businessId,
+    required String name,
+    required double price,
+    required Uint8List imageBytes,
+    String? description,
+    int stockQuantity = 10,
+    String filename = 'product.jpg',
+  }) async {
+    if (imageBytes.isEmpty) {
+      throw StateError('Product photo is empty — pick the photo again');
+    }
+    final created = await createProduct(
+      businessId: businessId,
+      name: name,
+      price: price,
+      description: description,
+      stockQuantity: stockQuantity,
+    );
+    try {
+      return await _uploadImageBytesWithRetry(
+        created.id,
+        imageBytes,
+        filename: filename,
+      );
+    } catch (e) {
+      // Hide incomplete listings from buyers until the owner adds a photo.
+      try {
+        await updateProduct(
+          productId: created.id,
+          status: 'INACTIVE',
+          isActive: false,
+        );
+      } catch (_) {}
+      throw StateError(
+        'Product saved but the photo failed to upload. '
+        'Open the product, tap Edit, and add the photo again so buyers can see it.',
+      );
+    }
+  }
+
   Future<ProductModel> uploadImage(String productId, XFile file) async {
     final bytes = await file.readAsBytes();
     var filename = file.name.isNotEmpty ? file.name : 'product.jpg';
-    final lower = filename.toLowerCase();
-    String contentType = 'image/jpeg';
-    if (lower.endsWith('.png') || (file.mimeType ?? '').contains('png')) {
+    return uploadImageBytes(productId, bytes, filename: filename, mimeType: file.mimeType);
+  }
+
+  Future<ProductModel> uploadImageBytes(
+    String productId,
+    Uint8List bytes, {
+    String filename = 'product.jpg',
+    String? mimeType,
+  }) async {
+    if (bytes.isEmpty) {
+      throw StateError('Photo data is empty');
+    }
+    var safeName = filename.isNotEmpty ? filename : 'product.jpg';
+    final lower = safeName.toLowerCase();
+    final mime = (mimeType ?? '').toLowerCase();
+    var contentType = 'image/jpeg';
+    if (lower.endsWith('.png') || mime.contains('png')) {
       contentType = 'image/png';
-      if (!lower.endsWith('.png')) filename = '$filename.png';
-    } else if (lower.endsWith('.webp') || (file.mimeType ?? '').contains('webp')) {
+      if (!lower.endsWith('.png')) safeName = '$safeName.png';
+    } else if (lower.endsWith('.webp') || mime.contains('webp')) {
       contentType = 'image/webp';
-      if (!lower.endsWith('.webp')) filename = '$filename.webp';
-    } else if (lower.endsWith('.gif') || (file.mimeType ?? '').contains('gif')) {
+      if (!lower.endsWith('.webp')) safeName = '$safeName.webp';
+    } else if (lower.endsWith('.gif') || mime.contains('gif')) {
       contentType = 'image/gif';
     } else if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
-      filename = '$filename.jpg';
+      safeName = '$safeName.jpg';
     }
+
     final form = FormData.fromMap({
       'file': MultipartFile.fromBytes(
         bytes,
-        filename: filename,
+        filename: safeName,
         contentType: MediaType.parse(contentType),
       ),
     });
+    // Do NOT set Content-Type manually — Dio must add the multipart boundary.
     final response = await _client.dio.post(
       '/products/$productId/images',
       data: form,
-      options: Options(contentType: 'multipart/form-data'),
     );
     return ProductModel.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<ProductModel> _uploadImageBytesWithRetry(
+    String productId,
+    Uint8List bytes, {
+    required String filename,
+  }) async {
+    try {
+      return await uploadImageBytes(productId, bytes, filename: filename);
+    } catch (_) {
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      return uploadImageBytes(productId, bytes, filename: filename);
+    }
   }
 }
 

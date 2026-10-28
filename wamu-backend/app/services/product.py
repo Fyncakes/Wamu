@@ -74,10 +74,11 @@ async def list_products(
         Product.is_active.is_(True),
     ]
     if require_image:
+        # Any saved photo counts — buyers must see items after a successful upload.
+        # (Older filter required is_primary only and hid valid listings.)
         filters.append(
             Product.id.in_(
                 select(ProductImage.product_id).where(
-                    ProductImage.is_primary.is_(True),
                     ProductImage.url.is_not(None),
                     ProductImage.url != "",
                 )
@@ -104,17 +105,26 @@ async def list_owner_products(
     user: User,
     business_id: uuid.UUID,
 ) -> list[Product]:
-    """All active products for a shop the user manages (including no photo yet)."""
+    """All products for a shop the user manages (incl. inactive / no photo yet)."""
     await assert_business_member(
         db,
         user,
         business_id,
         {MemberRole.OWNER.value, MemberRole.MANAGER.value, MemberRole.STAFF.value},
     )
-    rows, _ = await list_products(
-        db, business_id=business_id, page=1, page_size=100, require_image=False
-    )
-    return rows
+    rows = (
+        await db.execute(
+            select(Product)
+            .options(selectinload(Product.images))
+            .where(
+                Product.business_id == business_id,
+                Product.deleted_at.is_(None),
+            )
+            .order_by(Product.created_at.desc())
+            .limit(100)
+        )
+    ).scalars().all()
+    return list(rows)
 
 
 async def get_product(db: AsyncSession, product_id: uuid.UUID) -> Product:
@@ -140,7 +150,6 @@ async def related_products(
     limit = min(max(limit, 4), 24)
     has_image = Product.id.in_(
         select(ProductImage.product_id).where(
-            ProductImage.is_primary.is_(True),
             ProductImage.url.is_not(None),
             ProductImage.url != "",
         )

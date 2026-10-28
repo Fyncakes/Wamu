@@ -39,8 +39,13 @@ python -m scripts.bootstrap
 # Shop photos and clips live here. On Railway this is a mounted volume.
 MEDIA_DIR="${MEDIA_ROOT:-/app/media_uploads}"
 mkdir -p "$MEDIA_DIR"
+# Bundled placeholders (logos/covers) — never overwrite merchant uploads.
 if [ -d /app/seed_media ]; then
   cp -an /app/seed_media/. "$MEDIA_DIR/" || true
+fi
+if [ -d /app/media_uploads/seed ] && [ "$MEDIA_DIR" != "/app/media_uploads" ]; then
+  mkdir -p "$MEDIA_DIR/seed"
+  cp -an /app/media_uploads/seed/. "$MEDIA_DIR/seed/" || true
 fi
 
 # Cloud Run sets PORT (often 8080); local/Docker default 8000
