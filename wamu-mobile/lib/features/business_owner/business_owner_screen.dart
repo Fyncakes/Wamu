@@ -911,106 +911,202 @@ class _ManageProductsScreenState extends ConsumerState<ManageProductsScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _reloadProducts,
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                        children: [
-                          DropdownButtonFormField<String>(
-                            value: _businessId,
-                            decoration: const InputDecoration(labelText: 'Business'),
-                            items: _businesses
-                                .map(
-                                  (b) => DropdownMenuItem(
-                                    value: b.id,
-                                    child: Text(b.name),
+                      child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                            sliver: SliverToBoxAdapter(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  DropdownButtonFormField<String>(
+                                    value: _businessId,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Business',
+                                    ),
+                                    items: _businesses
+                                        .map(
+                                          (b) => DropdownMenuItem(
+                                            value: b.id,
+                                            child: Text(b.name),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: _onBusinessChanged,
                                   ),
-                                )
-                                .toList(),
-                            onChanged: _onBusinessChanged,
+                                  if (_loading)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 8),
+                                      child: LinearProgressIndicator(minHeight: 2),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          if (_loading)
-                            const LinearProgressIndicator(minHeight: 2),
                           if (_products.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 48),
-                              child: Center(child: Text('No products yet — tap Add product')),
+                            const SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Center(
+                                child: Text('No products yet — tap Add product'),
+                              ),
                             )
                           else
-                            ..._products.map((product) {
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  onTap: () => _showEditor(existing: product),
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: SizedBox(
-                                      width: 56,
-                                      height: 56,
-                                      child: WamuNetworkImage(imageUrl: product.imageUrl),
-                                    ),
-                                  ),
-                                  title: Text(product.name),
-                                  subtitle: Text(
-                                    '${formatUgx(product.price)} · '
-                                    'stock ${product.stockQuantity ?? '—'} · '
-                                    '${product.status}\n'
-                                    'Tap to edit',
-                                  ),
-                                  isThreeLine: true,
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        tooltip: 'Edit product',
-                                        icon: const Icon(Icons.edit_outlined),
-                                        onPressed: () =>
-                                            _showEditor(existing: product),
-                                      ),
-                                      PopupMenuButton<String>(
-                                        onSelected: (value) async {
-                                          switch (value) {
-                                            case 'edit':
-                                              await _showEditor(existing: product);
-                                            case 'photo':
-                                              await _pickAndUploadImage(product);
-                                            case 'oos':
-                                              await ref
-                                                  .read(ownerProductsRepositoryProvider)
-                                                  .updateProduct(
-                                                    productId: product.id,
-                                                    status: 'OUT_OF_STOCK',
-                                                    stockQuantity: 0,
-                                                  );
-                                              await _reloadProducts();
-                                          }
-                                        },
-                                        itemBuilder: (_) => const [
-                                          PopupMenuItem(
-                                            value: 'edit',
-                                            child: Text('Edit'),
-                                          ),
-                                          PopupMenuItem(
-                                            value: 'photo',
-                                            child: Text('Change photo'),
-                                          ),
-                                          PopupMenuItem(
-                                            value: 'oos',
-                                            child: Text('Mark out of stock'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  mainAxisSpacing: 8,
+                                  crossAxisSpacing: 8,
+                                  childAspectRatio: 0.62,
                                 ),
-                              );
-                            }),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final product = _products[index];
+                                    return _OwnerProductTile(
+                                      product: product,
+                                      onEdit: () =>
+                                          _showEditor(existing: product),
+                                      onPhoto: () =>
+                                          _pickAndUploadImage(product),
+                                      onOutOfStock: () async {
+                                        await ref
+                                            .read(ownerProductsRepositoryProvider)
+                                            .updateProduct(
+                                              productId: product.id,
+                                              status: 'OUT_OF_STOCK',
+                                              stockQuantity: 0,
+                                            );
+                                        await _reloadProducts();
+                                      },
+                                    );
+                                  },
+                                  childCount: _products.length,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
+    );
+  }
+}
+
+class _OwnerProductTile extends StatelessWidget {
+  const _OwnerProductTile({
+    required this.product,
+    required this.onEdit,
+    required this.onPhoto,
+    required this.onOutOfStock,
+  });
+
+  final ProductModel product;
+  final VoidCallback onEdit;
+  final VoidCallback onPhoto;
+  final Future<void> Function() onOutOfStock;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onEdit,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  WamuNetworkImage(imageUrl: product.imageUrl),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: PopupMenuButton<String>(
+                      padding: EdgeInsets.zero,
+                      icon: Container(
+                        margin: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.more_vert,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onSelected: (value) async {
+                        switch (value) {
+                          case 'edit':
+                            onEdit();
+                          case 'photo':
+                            onPhoto();
+                          case 'oos':
+                            await onOutOfStock();
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(
+                          value: 'photo',
+                          child: Text('Change photo'),
+                        ),
+                        PopupMenuItem(
+                          value: 'oos',
+                          child: Text('Mark out of stock'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatUgx(product.price),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppTheme.accentGreen,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    'stock ${product.stockQuantity ?? '—'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

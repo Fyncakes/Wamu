@@ -776,7 +776,10 @@ class _SavedContact {
 class _NewChatScreenState extends ConsumerState<NewChatScreen> {
   final _searchController = TextEditingController();
   bool _loading = false;
-  bool _dirLoading = true;
+  /// Permission / first paint only — do not block the whole screen on match.
+  bool _bootLoading = true;
+  bool _readingContacts = false;
+  bool _matchingWamu = false;
   bool _permissionDenied = false;
   String? _error;
   String _query = '';
@@ -798,14 +801,16 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
 
   Future<void> _loadDirectory() async {
     setState(() {
-      _dirLoading = true;
+      _bootLoading = true;
+      _readingContacts = false;
+      _matchingWamu = false;
       _error = null;
       _permissionDenied = false;
     });
     if (kIsWeb) {
       if (!mounted) return;
       setState(() {
-        _dirLoading = false;
+        _bootLoading = false;
         _error = 'Open Wamu on your phone to use contacts saved on this device.';
       });
       return;
@@ -819,11 +824,23 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
           _people = [];
           _inviteContacts = [];
           _onWamuCount = 0;
-          _dirLoading = false;
+          _bootLoading = false;
         });
         return;
       }
-      final contacts = await FlutterContacts.getContacts(withProperties: true);
+
+      // Leave the spinner — show the page while we read the address book.
+      setState(() {
+        _bootLoading = false;
+        _readingContacts = true;
+      });
+
+      // Photos make getContacts very slow on large address books.
+      final contacts = await FlutterContacts.getContacts(
+        withProperties: true,
+        withPhoto: false,
+        withThumbnail: false,
+      );
       final saved = <String, _SavedContact>{};
       for (final contact in contacts) {
         final name = contact.displayName.trim().isEmpty
@@ -835,6 +852,33 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
           saved.putIfAbsent(e164, () => _SavedContact(name: name, phone: e164));
         }
       }
+      final invite = saved.values.toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      if (!mounted) return;
+      // Paint invite list immediately; match Wamu users in the background.
+      setState(() {
+        _inviteContacts = invite;
+        _people = [];
+        _onWamuCount = 0;
+        _readingContacts = false;
+        _matchingWamu = saved.isNotEmpty;
+      });
+
+      if (saved.isEmpty) return;
+      await _matchOnWamu(saved);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = apiErrorMessage(e);
+        _bootLoading = false;
+        _readingContacts = false;
+        _matchingWamu = false;
+      });
+    }
+  }
+
+  Future<void> _matchOnWamu(Map<String, _SavedContact> saved) async {
+    try {
       final matched = await ref
           .read(chatRepositoryProvider)
           .matchSavedContacts(saved.keys.toList());
@@ -870,13 +914,13 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
         _people = people;
         _inviteContacts = invite;
         _onWamuCount = people.length;
-        _dirLoading = false;
+        _matchingWamu = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = apiErrorMessage(e);
-        _dirLoading = false;
+        _matchingWamu = false;
       });
     }
   }
@@ -1002,12 +1046,14 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
         actions: [
           IconButton(
             tooltip: 'Refresh',
-            onPressed: _dirLoading ? null : _loadDirectory,
+            onPressed: (_bootLoading || _readingContacts || _matchingWamu)
+                ? null
+                : _loadDirectory,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: _dirLoading
+      body: _bootLoading
           ? const LoadingView()
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -1025,6 +1071,15 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                     prefixIcon: Icon(Icons.search, color: AppTheme.muted(context)),
                   ),
                 ),
+                if (_readingContacts) ...[
+                  const SizedBox(height: 16),
+                  const LinearProgressIndicator(minHeight: 2),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Reading contacts on this phone…',
+                    style: TextStyle(color: AppTheme.muted(context)),
+                  ),
+                ],
                 if (_permissionDenied) ...[
                   const SizedBox(height: 16),
                   Text(
@@ -1041,7 +1096,13 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                   children: [
                     Text('On Wamu', style: theme.textTheme.titleMedium),
                     SizedBox(width: 8),
-                    if (_onWamuCount > 0)
+                    if (_matchingWamu)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else if (_onWamuCount > 0)
                       Text(
                         '$_onWamuCount',
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -1052,7 +1113,15 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                   ],
                 ),
                 SizedBox(height: 8),
-                if (_filtered.isEmpty)
+                if (_matchingWamu && _filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'Checking who is already on Wamu…',
+                      style: TextStyle(color: AppTheme.muted(context)),
+                    ),
+                  )
+                else if (_filtered.isEmpty)
                   Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Text(
