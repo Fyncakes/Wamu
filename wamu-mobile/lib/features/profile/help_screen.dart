@@ -42,8 +42,8 @@ class HelpScreen extends StatelessWidget {
         'Videos is the home tab — browse shops from the storefront icon. Orders live under the Orders tab; favourites are under You.',
       ),
       (
-        'Video calls not connecting?',
-        'Allow Camera and Microphone when asked. Both phones need a working network; same Wi‑Fi works best.',
+        'Video / voice calls not connecting?',
+        'Allow Camera and Microphone. Keep Wamu open on both phones (push for ringing needs FCM). Mobile data works best with a recent app build that includes TURN; same Wi‑Fi is still most reliable.',
       ),
     ];
 

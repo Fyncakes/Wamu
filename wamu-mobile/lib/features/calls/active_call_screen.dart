@@ -40,11 +40,14 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   String _status = 'Connecting…';
   bool _muted = false;
   bool _camOff = false;
+  bool _speakerOn = true;
   bool _renderersReady = false;
   bool _hasRemoteVideo = false;
   String? _peerUserId;
   bool _ending = false;
   bool _remoteDescriptionSet = false;
+  bool _iceRestarting = false;
+  Timer? _ringTimeout;
   final List<RTCIceCandidate> _pendingCandidates = [];
 
   @override
@@ -141,6 +144,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
         if (!mounted) return;
         if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
             state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+          _ringTimeout?.cancel();
           setState(() {
             if (_hasRemoteVideo || !widget.video) {
               _status = 'Connected';
@@ -153,8 +157,12 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
           if (remote != null) {
             unawaited(_bindRemoteStream(remote));
           }
-        } else if (state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
-          setState(() => _status = 'Connection failed — try again on Wi‑Fi');
+          if (!widget.video) {
+            unawaited(_setSpeaker(true));
+          }
+        } else if (state == RTCIceConnectionState.RTCIceConnectionStateFailed ||
+            state == RTCIceConnectionState.RTCIceConnectionStateDisconnected) {
+          unawaited(_tryIceRestart());
         }
       };
       _pc!.onIceCandidate = (candidate) {
@@ -185,9 +193,23 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
         await _pc!.addTrack(track, _localStream!);
       }
 
+      if (!widget.video) {
+        await _setSpeaker(true);
+      }
+
       if (widget.isCaller) {
         setState(() => _status = 'Calling…');
         // Wait for callee accept before SDP offer (avoids race)
+        _ringTimeout?.cancel();
+        _ringTimeout = Timer(const Duration(seconds: 45), () {
+          if (!mounted || _ending) return;
+          if (_status == 'Calling…' || _status == 'Ring answered…') {
+            setState(
+              () => _status =
+                  'No answer / weak network — keep both apps open and try again',
+            );
+          }
+        });
       } else {
         setState(() => _status = 'Connecting…');
         await repo.accept(widget.callId);
@@ -288,6 +310,44 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     }
   }
 
+  Future<void> _tryIceRestart() async {
+    if (_iceRestarting || _pc == null || _peerUserId == null || _channel == null) {
+      return;
+    }
+    if (!widget.isCaller) return;
+    _iceRestarting = true;
+    if (mounted) {
+      setState(() => _status = 'Reconnecting…');
+    }
+    try {
+      final offer = await _pc!.createOffer({
+        'iceRestart': true,
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': widget.video,
+      });
+      await _pc!.setLocalDescription(offer);
+      await ref.read(callsRepositoryProvider).sendSignal(
+            channel: _channel!,
+            callId: widget.callId,
+            toUserId: _peerUserId!,
+            data: {'type': 'offer', 'sdp': offer.toMap()},
+          );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _status = 'Connection failed — try Wi‑Fi or keep both apps open');
+      }
+    } finally {
+      _iceRestarting = false;
+    }
+  }
+
+  Future<void> _setSpeaker(bool on) async {
+    try {
+      await Helper.setSpeakerphoneOn(on);
+      if (mounted) setState(() => _speakerOn = on);
+    } catch (_) {}
+  }
+
   Future<void> _toggleMute() async {
     final tracks = _localStream?.getAudioTracks() ?? [];
     if (tracks.isEmpty) return;
@@ -307,6 +367,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   Future<void> _hangup({bool remote = false}) async {
     if (_ending) return;
     _ending = true;
+    _ringTimeout?.cancel();
     try {
       if (!remote) {
         await ref.read(callsRepositoryProvider).end(widget.callId);
@@ -317,6 +378,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   }
 
   Future<void> _cleanup() async {
+    _ringTimeout?.cancel();
     await _sub?.cancel();
     await _channel?.sink.close();
     await _localStream?.dispose();
@@ -328,6 +390,7 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
 
   @override
   void dispose() {
+    _ringTimeout?.cancel();
     _sub?.cancel();
     _channel?.sink.close();
     _localStream?.dispose();
@@ -468,9 +531,9 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
                     )
                   else
                     _RoundBtn(
-                      icon: Icons.volume_up,
-                      label: 'Speaker',
-                      onTap: () {},
+                      icon: _speakerOn ? Icons.volume_up : Icons.hearing,
+                      label: _speakerOn ? 'Speaker' : 'Earpiece',
+                      onTap: () => _setSpeaker(!_speakerOn),
                     ),
                 ],
               ),

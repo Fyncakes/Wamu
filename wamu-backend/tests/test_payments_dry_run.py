@@ -56,9 +56,10 @@ def test_rails_readiness_mock_dry_run(readiness_mock_only):
     r = readiness_mock_only
     assert r["ready_for_mock_dry_run"] is True
     assert r["ready_for_momo_sandbox"] is False
-    assert r["ready_for_carrier_calls"] is False
     assert r["mtn_collections_configured"] is False
-    assert r["ice_includes_turn"] is False
+    # Public OpenRelay TURN fallback so MTN/Airtel NAT phones can connect.
+    assert r["ice_includes_turn"] is True
+    assert r["ready_for_carrier_calls"] is True
 
 
 def test_rails_readiness_momo_sandbox_flags():

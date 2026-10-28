@@ -4,6 +4,26 @@ from __future__ import annotations
 
 from app.core.config import get_settings
 
+# Public Metered OpenRelay — unblocks MTN/Airtel CGNAT when no private coturn is set.
+# Replace with TURN_URLS + credentials in Railway for production quality / quotas.
+_OPENRELAY_TURN: list[dict] = [
+    {
+        "urls": "turn:openrelay.metered.ca:80",
+        "username": "openrelayproject",
+        "credential": "openrelayproject",
+    },
+    {
+        "urls": "turn:openrelay.metered.ca:443",
+        "username": "openrelayproject",
+        "credential": "openrelayproject",
+    },
+    {
+        "urls": "turns:openrelay.metered.ca:443",
+        "username": "openrelayproject",
+        "credential": "openrelayproject",
+    },
+]
+
 
 def _split_urls(raw: str) -> list[str]:
     return [u.strip() for u in (raw or "").split(",") if u.strip()]
@@ -14,7 +34,8 @@ def build_ice_servers() -> list[dict]:
     Return WebRTC iceServers entries.
 
     Always includes STUN (defaults to Google). When TURN_URLS + credentials
-    are set, appends TURN for MTN/Airtel CGNAT / symmetric NAT.
+    are set, appends those. Otherwise, when turn_use_public_fallback is on,
+    appends OpenRelay TURN so carrier-NAT phones can still connect.
     """
     s = get_settings()
     servers: list[dict] = []
@@ -36,5 +57,7 @@ def build_ice_servers() -> list[dict]:
                     "credential": s.turn_credential,
                 }
             )
+    elif getattr(s, "turn_use_public_fallback", True):
+        servers.extend(_OPENRELAY_TURN)
 
     return servers

@@ -28,9 +28,19 @@ class CallModel {
       for (final item in rawIce) {
         if (item is! Map) continue;
         final m = Map<String, dynamic>.from(item);
-        final urls = m['urls']?.toString();
-        if (urls == null || urls.isEmpty) continue;
-        final entry = <String, dynamic>{'urls': urls};
+        final rawUrls = m['urls'];
+        // Backend may send a string or a list of URLs.
+        final List<String> urlList;
+        if (rawUrls is List) {
+          urlList = rawUrls.map((e) => e.toString()).where((u) => u.isNotEmpty).toList();
+        } else {
+          final one = rawUrls?.toString() ?? '';
+          urlList = one.isEmpty ? const <String>[] : <String>[one];
+        }
+        if (urlList.isEmpty) continue;
+        final entry = <String, dynamic>{
+          'urls': urlList.length == 1 ? urlList.first : urlList,
+        };
         final user = m['username']?.toString();
         final cred = m['credential']?.toString();
         if (user != null && user.isNotEmpty) {
@@ -77,8 +87,22 @@ class CallModel {
         : const [
             {'urls': 'stun:stun.l.google.com:19302'},
             {'urls': 'stun:stun1.l.google.com:19302'},
+            {
+              'urls': 'turn:openrelay.metered.ca:80',
+              'username': 'openrelayproject',
+              'credential': 'openrelayproject',
+            },
+            {
+              'urls': 'turns:openrelay.metered.ca:443',
+              'username': 'openrelayproject',
+              'credential': 'openrelayproject',
+            },
           ];
-    return {'iceServers': servers};
+    return {
+      'iceServers': servers,
+      'sdpSemantics': 'unified-plan',
+      'iceCandidatePoolSize': 4,
+    };
   }
 }
 

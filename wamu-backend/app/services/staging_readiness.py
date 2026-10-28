@@ -16,6 +16,9 @@ def _split_urls(raw: str) -> list[str]:
 
 
 def _ice_servers_from(settings: Settings) -> list[dict]:
+    """Mirror app.services.ice.build_ice_servers for a given Settings object."""
+    from app.services.ice import _OPENRELAY_TURN
+
     servers: list[dict] = []
     stun = _split_urls(settings.stun_urls) or [
         "stun:stun.l.google.com:19302",
@@ -33,6 +36,8 @@ def _ice_servers_from(settings: Settings) -> list[dict]:
                     "credential": settings.turn_credential,
                 }
             )
+    elif getattr(settings, "turn_use_public_fallback", True):
+        servers.extend(_OPENRELAY_TURN)
     return servers
 
 
@@ -61,13 +66,16 @@ def rails_readiness(settings: Settings | None = None) -> dict[str, Any]:
     mtn_disb = mtn_disbursement_configured(s)
     airtel_disb = airtel_disbursement_configured(s)
     sms = _set(s.africastalking_username) and _set(s.africastalking_api_key)
-    turn = _set(s.turn_urls) and _set(s.turn_username) and _set(s.turn_credential)
+    dedicated_turn = (
+        _set(s.turn_urls) and _set(s.turn_username) and _set(s.turn_credential)
+    )
     ice = _ice_servers_from(s)
     has_turn_in_ice = any(
         "turn:" in str(entry.get("urls", "")).lower()
         or "turns:" in str(entry.get("urls", "")).lower()
         for entry in ice
     )
+    turn = dedicated_turn or has_turn_in_ice
     turn_local = _turn_urls_look_local(s.turn_urls)
     api_base = (s.public_api_base or "").rstrip("/")
     callback_reachable = bool(api_base) and not any(

@@ -123,13 +123,15 @@ class Settings(BaseSettings):
     fcm_server_key: str = ""
     # Presence online TTL — must exceed mobile presence.ping (~40s)
     presence_ttl_seconds: int = 90
-    # WebRTC ICE — STUN always; TURN optional for MTN/Airtel carrier NAT
+    # WebRTC ICE — STUN always; TURN needed for MTN/Airtel carrier NAT
     stun_urls: str = (
         "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
     )
     turn_urls: str = ""  # comma-separated turn:/turns: URIs
     turn_username: str = ""
     turn_credential: str = ""
+    # When private TURN is unset, use public OpenRelay so cellular calls can connect.
+    turn_use_public_fallback: bool = True
     # Optional — leave empty in local/dev
     sentry_dsn: str = ""
     # Short-video delivery (ffmpeg). Empty = auto-detect bundled/.tools or PATH.
