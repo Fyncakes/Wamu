@@ -241,16 +241,22 @@ async def initiate_payment(db: AsyncSession, user: User, data: PaymentCreate) ->
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     payment.provider_reference = result.provider_reference
     payment.raw_response = result.raw
-    payment.status = (
-        PaymentStatus.SUCCESS.value
-        if result.status == "SUCCESS"
-        else PaymentStatus.PROCESSING.value
-    )
+    if result.status == "SUCCESS":
+        payment.status = PaymentStatus.SUCCESS.value
+    elif result.status == "FAILED":
+        payment.status = PaymentStatus.FAILED.value
+        metrics.incr(PAYMENT_FAILED)
+    else:
+        payment.status = PaymentStatus.PROCESSING.value
 
     mock_hint: str | None = None
     if payment.status == PaymentStatus.SUCCESS.value:
         await finalize_payment_success(db, payment)
-    elif _momo_otp_rail(payment.provider) and (result.raw or {}).get("otp_required"):
+    elif (
+        payment.status != PaymentStatus.FAILED.value
+        and _momo_otp_rail(payment.provider)
+        and (result.raw or {}).get("otp_required")
+    ):
         mock_hint = await _issue_payment_otp(db, payment)
     await db.flush()
     # Request-scoped only — not a DB column (avoids persisting OTP plaintext).

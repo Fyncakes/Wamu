@@ -16,6 +16,7 @@ from decimal import Decimal
 import httpx
 
 from app.core.config import Settings, get_settings
+from app.integrations.payments.mtn_common import normalize_mtn_msisdn
 from app.integrations.payments.provider import PaymentInitResult
 
 logger = logging.getLogger(__name__)
@@ -145,7 +146,7 @@ class MTNDisbursementAdapter(DisbursementProvider):
             )
         sub, _, _ = _mtn_disbursement_creds(settings)
         external_id = str(uuid.uuid4())
-        msisdn = (payee_phone or "").lstrip("+")
+        msisdn = normalize_mtn_msisdn(payee_phone)
         url = f"{settings.mtn_base_url.rstrip('/')}/disbursement/v1_0/transfer"
         callback = _callback_url(settings, "MTN")
         momo_currency = (

@@ -16,6 +16,7 @@ from decimal import Decimal
 import httpx
 
 from app.core.config import get_settings
+from app.integrations.payments.mtn_common import normalize_mtn_msisdn
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +192,10 @@ class MTNAdapter(PaymentProvider):
             "amount": str(amount),
             "currency": momo_currency,
             "externalId": external_id,
-            "payer": {"partyIdType": "MSISDN", "partyId": (phone or "").lstrip("+")},
+            "payer": {
+                "partyIdType": "MSISDN",
+                "partyId": normalize_mtn_msisdn(phone),
+            },
             "payerMessage": "Enter your MoMo PIN to pay Wamu",
             "payeeNote": reference,
         }
@@ -202,8 +206,10 @@ class MTNAdapter(PaymentProvider):
             "Content-Type": "application/json",
         }
         pub = (settings.public_api_base or "").rstrip("/")
+        callback_url = ""
         if pub and not pub.startswith("http://127.") and not pub.startswith("http://localhost"):
-            headers["X-Callback-Url"] = f"{pub}/api/v1/payments/webhooks/MTN"
+            callback_url = f"{pub}/api/v1/payments/webhooks/MTN"
+            headers["X-Callback-Url"] = callback_url
         url = f"{settings.mtn_base_url.rstrip('/')}/collection/v1_0/requesttopay"
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
@@ -223,7 +229,31 @@ class MTNAdapter(PaymentProvider):
                 access = token_res.json().get("access_token")
                 headers["Authorization"] = f"Bearer {access}"
                 res = await client.post(url, json=payload, headers=headers)
-                logger.info("MTN requesttopay %s → %s", resource_id, res.status_code)
+                # Sandbox API users bind providerCallbackHost at provision time. If
+                # PUBLIC_API_BASE host differs (e.g. webhook.site vs Railway), MTN
+                # returns 500 INVALID_CALLBACK_URL_HOST — retry without callback;
+                # client refresh still polls GET /requesttopay/{id}.
+                if (
+                    res.status_code >= 400
+                    and callback_url
+                    and "INVALID_CALLBACK_URL_HOST" in (res.text or "")
+                ):
+                    logger.warning(
+                        "MTN requesttopay %s callback host rejected (%s); retrying without X-Callback-Url",
+                        resource_id,
+                        res.text[:160],
+                    )
+                    headers.pop("X-Callback-Url", None)
+                    res = await client.post(url, json=payload, headers=headers)
+                if res.status_code in (200, 202):
+                    logger.info("MTN requesttopay %s → %s", resource_id, res.status_code)
+                else:
+                    logger.warning(
+                        "MTN requesttopay %s → %s %s",
+                        resource_id,
+                        res.status_code,
+                        (res.text or "")[:300],
+                    )
                 return PaymentInitResult(
                     provider_reference=resource_id,
                     status="PENDING" if res.status_code in (200, 202) else "FAILED",
@@ -231,6 +261,7 @@ class MTNAdapter(PaymentProvider):
                         "http_status": res.status_code,
                         "body": res.text[:800],
                         "externalId": external_id,
+                        "currency": momo_currency,
                     },
                 )
         except httpx.HTTPError as exc:
