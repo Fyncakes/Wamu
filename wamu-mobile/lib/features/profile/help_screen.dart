@@ -43,7 +43,7 @@ class HelpScreen extends StatelessWidget {
       ),
       (
         'Video / voice calls not connecting?',
-        'Allow Camera and Microphone. Keep Wamu open on both phones (push for ringing needs FCM). Mobile data works best with a recent app build that includes TURN; same Wi‑Fi is still most reliable.',
+        'Allow Camera, Microphone, and Notifications. With a recent build, the phone can ring from a push even if Wamu was in the background. Mobile data needs TURN (included in current builds); same Wi‑Fi is still most reliable.',
       ),
     ];
 

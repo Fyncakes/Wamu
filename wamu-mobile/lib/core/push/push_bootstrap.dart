@@ -9,13 +9,31 @@ import '../../firebase_options.dart';
 import '../../features/profile/commerce_notif_provider.dart';
 import '../notifications/local_notifications.dart';
 import '../storage/secure_storage.dart';
+import 'call_focus.dart';
 import 'chat_focus.dart';
 import 'push_token_repository.dart';
 
-/// Background isolate entry. The OS shows the generic notification payload.
+/// Background isolate entry. The OS shows the FCM notification payload.
+/// For data-only call wakes, mirror a local heads-up on the calls channel.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Wake only. Do not build a second notification here.
+  final type = message.data['type']?.toString() ?? '';
+  if (type != 'INCOMING_CALL') return;
+  final callId = message.data['call_id']?.toString() ?? '';
+  if (callId.isEmpty) return;
+  // When FCM already includes a notification block, Android shows it — skip duplicate.
+  if (message.notification != null) return;
+  try {
+    await ensureLocalNotificationsReady();
+    final kind = (message.data['call_type']?.toString() ?? 'VOICE').toUpperCase();
+    final name = message.data['caller_name']?.toString();
+    await showWamuLocalNotification(
+      title: name == null || name.isEmpty ? 'Wamu' : name,
+      body: kind == 'VIDEO' ? 'Incoming video call' : 'Incoming voice call',
+      payload: 'call:$callId',
+      callAlert: true,
+    );
+  } catch (_) {}
 }
 
 /// Initializes Firebase + FCM when options are configured (store builds).
@@ -74,6 +92,11 @@ class PushBootstrap {
   Future<void> _listen() async {
     final ready = await ensureInitialized();
     if (!ready) return;
+
+    onWamuNotificationTap ??= (payload) {
+      _handleLocalTap(payload);
+    };
+
     _tokenSub?.cancel();
     _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       unawaited(registerPushTokenIfSupported(_ref, token: token));
@@ -81,34 +104,112 @@ class PushBootstrap {
 
     _foregroundSub?.cancel();
     _foregroundSub = FirebaseMessaging.onMessage.listen((message) {
-      unawaited(_showForegroundBanner(message));
-      if (_isChatPush(message)) {
-        _onChatPush(message, tapped: false);
-      } else {
-        unawaited(_refreshCommerceInbox());
-      }
+      unawaited(_onForeground(message));
     });
 
     _openedSub?.cancel();
     _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      if (_isChatPush(message)) {
-        _onChatPush(message, tapped: true);
-      } else {
-        unawaited(_refreshCommerceInbox());
-      }
+      _routePush(message, tapped: true);
     });
 
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {
-      if (_isChatPush(initial)) {
-        _onChatPush(initial, tapped: true);
+      _routePush(initial, tapped: true);
+    }
+  }
+
+  void _handleLocalTap(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+    if (payload.startsWith('call:')) {
+      final callId = payload.substring(5);
+      if (callId.isEmpty) return;
+      _ref.read(pendingIncomingCallProvider.notifier).state = PendingIncomingCall(
+        callId: callId,
+        callType: 'VOICE',
+      );
+      return;
+    }
+    if (payload.startsWith('chat:')) {
+      final id = payload.substring(5);
+      if (id.isNotEmpty) {
+        _ref.read(pendingChatOpenProvider.notifier).state = id;
       }
+    }
+  }
+
+  Future<void> _onForeground(RemoteMessage message) async {
+    final type = message.data['type']?.toString() ?? '';
+    if (type == 'CALL_CANCELLED') {
+      final callId = message.data['call_id']?.toString() ?? '';
+      if (callId.isNotEmpty) {
+        _ref.read(cancelledCallIdProvider.notifier).state = callId;
+        unawaited(cancelWamuNotificationForPayload('call:$callId'));
+      }
+      return;
+    }
+    if (type == 'INCOMING_CALL') {
+      _routePush(message, tapped: false);
+      return;
+    }
+    unawaited(_showForegroundBanner(message));
+    if (_isChatPush(message)) {
+      _onChatPush(message, tapped: false);
+    } else {
+      unawaited(_refreshCommerceInbox());
+    }
+  }
+
+  void _routePush(RemoteMessage message, {required bool tapped}) {
+    final type = message.data['type']?.toString() ?? '';
+    if (type == 'CALL_CANCELLED') {
+      final callId = message.data['call_id']?.toString() ?? '';
+      if (callId.isNotEmpty) {
+        _ref.read(cancelledCallIdProvider.notifier).state = callId;
+        unawaited(cancelWamuNotificationForPayload('call:$callId'));
+      }
+      return;
+    }
+    if (type == 'INCOMING_CALL') {
+      _onCallPush(message, tapped: tapped);
+      return;
+    }
+    if (_isChatPush(message)) {
+      _onChatPush(message, tapped: tapped);
+      return;
+    }
+    if (tapped) {
+      unawaited(_refreshCommerceInbox());
     }
   }
 
   bool _isChatPush(RemoteMessage message) {
     final type = message.data['type'] ?? '';
     return type == 'NEW_MESSAGE' && (message.data['conversation_id'] ?? '').isNotEmpty;
+  }
+
+  void _onCallPush(RemoteMessage message, {required bool tapped}) {
+    final callId = message.data['call_id']?.toString() ?? '';
+    if (callId.isEmpty) return;
+    final pending = PendingIncomingCall(
+      callId: callId,
+      callType: message.data['call_type']?.toString() ?? 'VOICE',
+      callerId: message.data['caller_id']?.toString(),
+      callerName: message.data['caller_name']?.toString(),
+    );
+    _ref.read(pendingIncomingCallProvider.notifier).state = pending;
+    if (!tapped) {
+      // App already open — still show a heads-up in case the dialog is delayed.
+      unawaited(
+        showWamuLocalNotification(
+          title: pending.callerName?.isNotEmpty == true
+              ? pending.callerName!
+              : 'Wamu',
+          body: pending.isVideo ? 'Incoming video call' : 'Incoming voice call',
+          payload: 'call:$callId',
+          callAlert: true,
+        ),
+      );
+    }
   }
 
   String _chatLabel(RemoteMessage message) {

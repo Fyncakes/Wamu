@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from unittest.mock import patch
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base, get_db
 from app.core.security import hash_token
 from app.main import app
-from app.models.user import OtpChallenge, User, UserProfile, UserRole
+from app.models.user import OtpChallenge
 
 TEST_DB = "sqlite+aiosqlite:///:memory:"
 
@@ -91,17 +91,25 @@ async def test_voice_call_includes_turn_and_accept_end(env):
     callee = env["tokens"][callee_phone]
     callee_id = env["ids"][callee_phone]
 
-    start = await ac.post(
-        "/api/v1/calls",
-        headers=_auth(caller),
-        json={"callee_id": callee_id, "call_type": "VOICE"},
-    )
+    with patch("app.workers.tasks.send_push_notification") as push:
+        push.delay = push
+        start = await ac.post(
+            "/api/v1/calls",
+            headers=_auth(caller),
+            json={"callee_id": callee_id, "call_type": "VOICE"},
+        )
     assert start.status_code == 201, start.text
     body = start.json()
     assert body["status"] == "RINGING"
     assert body["call_type"] == "VOICE"
     assert _has_turn(body["ice_servers"]), body["ice_servers"]
     call_id = body["id"]
+    assert push.called
+    push_args = push.call_args[0]
+    assert push_args[0] == callee_id
+    assert push_args[2] == "Incoming voice call"
+    assert push_args[3]["type"] == "INCOMING_CALL"
+    assert push_args[3]["call_id"] == call_id
 
     ticket = await ac.post("/api/v1/calls/ws-ticket", headers=_auth(caller))
     assert ticket.status_code == 200
@@ -124,20 +132,48 @@ async def test_video_call_flow_and_reject(env):
     callee = env["tokens"][callee_phone]
     callee_id = env["ids"][callee_phone]
 
-    start = await ac.post(
-        "/api/v1/calls",
-        headers=_auth(caller),
-        json={"callee_id": callee_id, "call_type": "VIDEO"},
-    )
+    with patch("app.workers.tasks.send_push_notification") as push:
+        push.delay = push
+        start = await ac.post(
+            "/api/v1/calls",
+            headers=_auth(caller),
+            json={"callee_id": callee_id, "call_type": "VIDEO"},
+        )
     assert start.status_code == 201, start.text
     body = start.json()
     assert body["call_type"] == "VIDEO"
     assert _has_turn(body["ice_servers"]), body["ice_servers"]
     call_id = body["id"]
+    assert push.call_args[0][2] == "Incoming video call"
+    assert push.call_args[0][3]["call_type"] == "VIDEO"
 
     rejected = await ac.post(f"/api/v1/calls/{call_id}/reject", headers=_auth(callee))
     assert rejected.status_code == 200
     assert rejected.json()["status"] == "REJECTED"
+
+
+async def test_caller_cancel_enqueues_missed_call_push(env):
+    ac = env["client"]
+    caller_phone, callee_phone = env["phones"]
+    caller = env["tokens"][caller_phone]
+    callee_id = env["ids"][callee_phone]
+
+    with patch("app.workers.tasks.send_push_notification") as push:
+        push.delay = push
+        start = await ac.post(
+            "/api/v1/calls",
+            headers=_auth(caller),
+            json={"callee_id": callee_id, "call_type": "VOICE"},
+        )
+        assert start.status_code == 201, start.text
+        call_id = start.json()["id"]
+        push.reset_mock()
+        ended = await ac.post(f"/api/v1/calls/{call_id}/end", headers=_auth(caller))
+    assert ended.status_code == 200
+    assert ended.json()["status"] == "CANCELLED"
+    assert push.called
+    assert push.call_args[0][3]["type"] == "CALL_CANCELLED"
+    assert push.call_args[0][3]["call_id"] == call_id
 
 
 async def test_health_rails_marks_carrier_calls_ready():

@@ -89,9 +89,27 @@ def test_fcm_payload_is_generic_and_tappable():
         data={"type": "NEW_MESSAGE", "conversation_id": "abc", "message_kind": "IMAGE"},
     )
     assert payload["notification"]["body"] == "Photo"
+    assert payload["notification"]["android_channel_id"] == "wamu_messages"
     assert payload["data"]["conversation_id"] == "abc"
     assert payload["data"]["message_kind"] == "IMAGE"
     assert "preview" not in payload["data"]
+
+
+def test_fcm_incoming_call_uses_calls_channel_and_tag():
+    payload = build_fcm_payload(
+        token="token",
+        title="Wamu",
+        body="Incoming voice call",
+        data={
+            "type": "INCOMING_CALL",
+            "call_id": "c1",
+            "call_type": "VOICE",
+            "caller_name": "Ada",
+        },
+    )
+    assert payload["notification"]["android_channel_id"] == "wamu_calls"
+    assert payload["notification"]["tag"] == "wamu_call_c1"
+    assert payload["data"]["type"] == "INCOMING_CALL"
 
 
 @pytest.mark.asyncio

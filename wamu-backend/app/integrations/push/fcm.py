@@ -52,20 +52,32 @@ def build_fcm_payload(
     """OS-visible notification plus data so a tap can open the conversation.
 
     Title and body stay generic. Message text never goes in this payload.
+    Incoming calls use the wamu_calls Android channel (max importance).
     """
+    safe = {k: str(v) for k, v in data.items()}
+    channel = safe.get("android_channel_id") or (
+        "wamu_calls" if safe.get("type") == "INCOMING_CALL" else "wamu_messages"
+    )
+    notification: dict[str, str] = {
+        "title": title,
+        "body": body,
+        "sound": "default",
+        "android_channel_id": channel,
+    }
+    # Collapse / replace prior ring for the same call id.
+    call_id = safe.get("call_id")
+    if call_id and safe.get("type") in {"INCOMING_CALL", "CALL_CANCELLED"}:
+        notification["tag"] = f"wamu_call_{call_id}"
     return {
         "to": token,
         "priority": "high",
         "content_available": True,
-        "notification": {
-            "title": title,
-            "body": body,
-            "sound": "default",
-        },
+        "notification": notification,
         "data": {
-            **{k: str(v) for k, v in data.items()},
+            **safe,
             "title": title,
             "body": body,
+            "android_channel_id": channel,
         },
     }
 

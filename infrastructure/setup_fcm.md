@@ -44,10 +44,21 @@ Restart API + Celery worker (worker required for push enqueue).
 # API_BASE_URL="$(cat dist/DEMO_URL.txt)/api/v1" ./infrastructure/build_phone_apk.sh
 ```
 
-## 5. Verify
+## 5. Railway (staging / production)
 
-1. Install APK, login as rider, grant notification permission
-2. Place an order that creates a delivery job
-3. Rider phone should wake with a generic “Wamu” data push; in-app commerce inbox shows the job
+Set the same key on **api** and **worker** (Celery delivers pushes):
+
+```bash
+# Railway Variables
+FCM_SERVER_KEY=...legacy server key from Firebase Cloud Messaging...
+```
+
+Confirm: `GET /api/v1/health/rails` → `fcm_server_key_set: true`.
+
+## 6. Verify
+
+1. Install APK, login, grant notification permission
+2. Place an order that creates a delivery job — rider phone should wake
+3. Call another signed-in phone with Wamu in the background — callee should get an **Incoming call** heads-up (`INCOMING_CALL` / `wamu_calls` channel)
 
 See also: `documentation/PUSH_NOTIFICATIONS.md`

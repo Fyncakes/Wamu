@@ -111,6 +111,26 @@ async def _peer_for(db: AsyncSession, call: CallSession, me: User) -> User | Non
     )
 
 
+def _enqueue_call_push(
+    *,
+    user_id: UUID,
+    title: str,
+    body: str,
+    data: dict[str, str],
+) -> None:
+    """Wake callee phones when the app is backgrounded (FCM when configured)."""
+    try:
+        from app.workers.tasks import send_push_notification
+
+        try:
+            send_push_notification.delay(str(user_id), title, body, data)
+        except Exception:
+            # Broker down — sync send so trial Railway still rings when FCM is set.
+            send_push_notification(str(user_id), title, body, data)
+    except Exception:
+        pass
+
+
 async def _resolve_callee(
     db: AsyncSession, user: User, body: CallCreate
 ) -> tuple[UUID, UUID | None]:
@@ -171,12 +191,27 @@ async def start_call(
     await db.flush()
     peer = await _peer_for(db, call, user)
     resp = CallResponse.model_validate(_serialize(call, me=user, peer=peer))
+    caller_name = _display_name(user)
     await hub.send(
         str(callee_id),
         {
             "event": "call.incoming",
             **resp.model_dump(mode="json"),
-            "caller_name": _display_name(user),
+            "caller_name": caller_name,
+        },
+    )
+    kind = "video" if body.call_type == "VIDEO" else "voice"
+    _enqueue_call_push(
+        user_id=callee_id,
+        title="Wamu",
+        body=f"Incoming {kind} call",
+        data={
+            "type": "INCOMING_CALL",
+            "call_id": str(call.id),
+            "call_type": body.call_type,
+            "caller_id": str(user.id),
+            "caller_name": caller_name,
+            "android_channel_id": "wamu_calls",
         },
     )
     return resp
@@ -273,6 +308,18 @@ async def end_call(
     resp = CallResponse.model_validate(_serialize(call, me=user, peer=peer))
     other = call.callee_id if user.id == call.caller_id else call.caller_id
     await hub.send(str(other), {"event": "call.ended", **resp.model_dump(mode="json")})
+    # Stop background ring UI when caller cancels before answer.
+    if call.status == "CANCELLED":
+        _enqueue_call_push(
+            user_id=call.callee_id,
+            title="Wamu",
+            body="Missed call",
+            data={
+                "type": "CALL_CANCELLED",
+                "call_id": str(call.id),
+                "call_type": call.call_type,
+            },
+        )
     return resp
 
 
