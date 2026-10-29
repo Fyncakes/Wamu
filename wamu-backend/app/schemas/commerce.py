@@ -30,7 +30,7 @@ class OrderCreate(BaseModel):
     # When set, posts an ORDER_CARD into this business chat (transactional chat)
     conversation_id: UUID | None = None
     # Merchant creating a receipt for the buyer (must be business member).
-    # If omitted with conversation_id, inferred as the non-staff chat peer.
+    # Chat peer is inferred only for explicit receipts (customer_id or unit_price set).
     customer_id: UUID | None = None
     checkout_batch_id: UUID | None = None
 

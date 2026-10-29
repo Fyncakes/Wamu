@@ -94,7 +94,20 @@ async def _buyer_from_business_chat(
             status_code=400,
             detail="No buyer in this chat — open Chat to Order with the customer first",
         )
+    if len(buyers) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Ambiguous buyer in this chat — send customer_id on the receipt",
+        )
     return buyers[0]
+
+
+def _is_explicit_merchant_receipt(data: OrderCreate) -> bool:
+    """True only for intentional shop→buyer billing (not staff self-orders in chat)."""
+    if data.customer_id is not None:
+        return True
+    # Receipt composer always sends unit_price; customer "Send order card" does not.
+    return any(item.unit_price is not None for item in data.items)
 
 
 async def create_order(db: AsyncSession, user: User, data: OrderCreate) -> Order:
@@ -110,8 +123,13 @@ async def create_order(db: AsyncSession, user: User, data: OrderCreate) -> Order
             raise HTTPException(status_code=403, detail="Only the shop can bill a buyer")
         customer_id = data.customer_id
         merchant_receipt = True
-    elif is_staff and data.conversation_id is not None:
-        # Seller composing a receipt in shop chat — bill the buyer peer.
+    elif (
+        is_staff
+        and data.conversation_id is not None
+        and _is_explicit_merchant_receipt(data)
+    ):
+        # Seller composing a bargained receipt in shop chat — bill the buyer peer.
+        # Catalog-priced staff/self orders keep customer_id = the authenticated user.
         customer_id = await _buyer_from_business_chat(
             db, conversation_id=data.conversation_id, business_id=data.business_id
         )

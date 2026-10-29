@@ -107,6 +107,8 @@ class SecureStorageService {
     await _delete(_userIdKey);
     await _delete(_phoneKey);
     await _delete(_userSnapshotKey);
+    // Per-account UI prefs — avoid leaking hidden-order state across logins.
+    await _delete('wamu_hidden_order_ids');
   }
 
   Future<void> clearAll() async {

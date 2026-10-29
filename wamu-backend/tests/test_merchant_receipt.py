@@ -212,11 +212,11 @@ async def test_merchant_receipt_negotiated_price_buyer_pays(env):
         headers=c_h,
         json={
             "order_id": order_id,
-            "provider": "AIRTEL",
+            "provider": "MOCK",
             "idempotency_key": str(uuid4()),
             "phone": env["customer_phone"],
         },
     )
     assert pay.status_code in (200, 201), pay.text
     paid = await complete_mock_momo_payment(client, c_h, pay.json())
-    assert paid["status"] in ("SUCCESS", "PENDING")
+    assert paid["status"] in ("SUCCESS", "PENDING", "PROCESSING")

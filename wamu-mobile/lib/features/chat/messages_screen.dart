@@ -3520,7 +3520,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             .join(', ');
     final meId = ref.read(authProvider).user?.id;
     final customerId = card['customer_id']?.toString();
-    final iAmBuyer = customerId == null || customerId == meId;
+    // Missing customer_id on legacy cards → never treat as buyer (server still owns pay).
+    final iAmBuyer = customerId != null && customerId == meId;
     final canPay = !paid && iAmBuyer && !_isMerchantInChat;
     final canEdit = !paid && _isMerchantInChat;
     final orderId = card['order_id']?.toString();
