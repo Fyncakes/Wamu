@@ -80,24 +80,44 @@ class CallModel {
   bool get isVideo => callType == 'VIDEO';
   bool get isIncoming => direction == 'INCOMING';
 
-  /// WebRTC peer-connection config (API TURN when present, else Google STUN).
+  static const _fallbackStun = <Map<String, dynamic>>[
+    {'urls': 'stun:stun.l.google.com:19302'},
+    {'urls': 'stun:stun1.l.google.com:19302'},
+  ];
+
+  /// Public TURN — required on MTN/Airtel CGNAT when API has no private coturn yet.
+  static const _fallbackTurn = <Map<String, dynamic>>[
+    {
+      'urls': 'turn:openrelay.metered.ca:80',
+      'username': 'openrelayproject',
+      'credential': 'openrelayproject',
+    },
+    {
+      'urls': 'turn:openrelay.metered.ca:443',
+      'username': 'openrelayproject',
+      'credential': 'openrelayproject',
+    },
+    {
+      'urls': 'turns:openrelay.metered.ca:443',
+      'username': 'openrelayproject',
+      'credential': 'openrelayproject',
+    },
+  ];
+
+  /// WebRTC peer-connection config. Always ensure TURN is present for cellular.
   Map<String, dynamic> get peerConnectionConfig {
-    final servers = iceServers.isNotEmpty
-        ? iceServers
-        : const [
-            {'urls': 'stun:stun.l.google.com:19302'},
-            {'urls': 'stun:stun1.l.google.com:19302'},
-            {
-              'urls': 'turn:openrelay.metered.ca:80',
-              'username': 'openrelayproject',
-              'credential': 'openrelayproject',
-            },
-            {
-              'urls': 'turns:openrelay.metered.ca:443',
-              'username': 'openrelayproject',
-              'credential': 'openrelayproject',
-            },
-          ];
+    final servers = <Map<String, dynamic>>[
+      ... (iceServers.isNotEmpty ? iceServers : _fallbackStun),
+    ];
+    final hasTurn = servers.any((s) {
+      final urls = s['urls'];
+      final text = urls is List ? urls.join(' ') : urls?.toString() ?? '';
+      final lower = text.toLowerCase();
+      return lower.contains('turn:') || lower.contains('turns:');
+    });
+    if (!hasTurn) {
+      servers.addAll(_fallbackTurn);
+    }
     return {
       'iceServers': servers,
       'sdpSemantics': 'unified-plan',
