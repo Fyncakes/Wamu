@@ -15,6 +15,8 @@ class AppConfig {
 
   static const String apiHostOverride = String.fromEnvironment('API_HOST');
   static const String apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
+  /// Public admin website (Next.js). Empty → derive from API host / admin.wamu.ug.
+  static const String adminBaseUrlOverride = String.fromEnvironment('ADMIN_BASE_URL');
 
   /// Railway / MTN-first launch: hide Airtel Money in checkout unless enabled at build time.
   static const bool momoAirtelEnabled =

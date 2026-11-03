@@ -65,7 +65,12 @@ class UserModel {
 
   bool get needsProfileSetup => name.trim().isEmpty;
   bool get isBusinessOwner => ownsBusiness || role == 'BUSINESS';
-  bool get isAdmin => role.toUpperCase() == 'ADMIN';
+  /// Matches backend permanent owner admin (+256788578208 / 0788578208).
+  bool get isAdmin {
+    if (role.toUpperCase() == 'ADMIN') return true;
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return digits == '256788578208' || digits == '0788578208';
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,

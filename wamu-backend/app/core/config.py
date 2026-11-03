@@ -89,6 +89,8 @@ class Settings(BaseSettings):
     payment_webhook_secret: str = "dev-webhook-secret-change-me"
     # Public API origin for provider callbacks (no trailing slash)
     public_api_base: str = "http://127.0.0.1:8000"
+    # Admin Next.js origin (phone / desktop). Added to CORS automatically.
+    public_admin_base: str = ""
     # MTN MoMo Collections (leave empty until staging credentials issued)
     mtn_subscription_key: str = ""
     mtn_api_user: str = ""

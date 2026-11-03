@@ -14,12 +14,13 @@ Deploy the shared staging API from [Railway](https://railway.com/dashboard) usin
 | MinIO / `S3_ENABLED` | yes | **skip** — leave `S3_ENABLED=false` |
 | Stable outbound IP (Airtel whitelist) | VPS / Hetzner | **not on trial** — see [Airtel](#airtel-and-momo) |
 
-Trial projects are limited to **5 services per project**. This layout uses exactly four:
+Trial projects are limited to **5 services per project**. Core layout uses four; add **wamu-admin** when you need the phone/desktop admin website:
 
 1. **wamu-api** — GitHub repo, root directory `wamu-backend`, Dockerfile default CMD  
 2. **wamu-worker** — same repo/root, start command `/app/scripts/entrypoint_celery.sh worker-beat`  
 3. **PostgreSQL** — Railway database  
 4. **Redis** — Railway database  
+5. **wamu-admin** (optional) — root directory `wamu-admin`, Dockerfile; set `NEXT_PUBLIC_API_URL=https://YOUR-API.up.railway.app/api/v1`, Generate Domain, then set API `PUBLIC_ADMIN_BASE` + add that origin to `CORS_ORIGINS`. Sign in as `+256788578208`.  
 
 ## Prerequisites
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config.dart';
 import '../../core/server_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/utils/ugx_formatter.dart';
@@ -83,26 +84,40 @@ class _AdminHubScreenState extends ConsumerState<AdminHubScreen>
   }
 
   Future<void> _openFullWebAdmin() async {
+    final candidates = <Uri>[];
+    const baked = AppConfig.adminBaseUrlOverride;
+    if (baked.trim().isNotEmpty) {
+      candidates.add(Uri.parse(baked.trim()));
+    }
+    candidates.add(Uri.parse('https://admin.wamu.ug'));
     final origin = ServerConfig.mediaOrigin;
     final uri = Uri.tryParse(origin);
-    if (uri == null) return;
-    final host = uri.host;
-    final candidates = <Uri>[
-      if (host.startsWith('192.168.') || host == '127.0.0.1' || host == 'localhost')
-        Uri(scheme: 'http', host: host, port: 3000),
-      Uri(scheme: 'http', host: '192.168.100.121', port: 3000),
-      Uri.parse('$origin/connect'),
-    ];
+    if (uri != null) {
+      final host = uri.host;
+      // Same Railway project often uses a sibling *-admin* hostname.
+      if (host.endsWith('.up.railway.app')) {
+        final base = host.replaceFirst(RegExp(r'^wamu(-production)?'), 'wamu-admin');
+        if (base != host) {
+          candidates.add(Uri(scheme: 'https', host: base));
+        }
+        candidates.add(Uri(scheme: 'https', host: 'wamu-admin-production.up.railway.app'));
+      }
+      if (host.startsWith('192.168.') || host == '127.0.0.1' || host == 'localhost') {
+        candidates.add(Uri(scheme: 'http', host: host, port: 3000));
+      }
+    }
     for (final u in candidates) {
-      if (await canLaunchUrl(u)) {
+      try {
         final ok = await launchUrl(u, mode: LaunchMode.externalApplication);
         if (ok) return;
-      }
+      } catch (_) {}
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Open admin on Wi‑Fi: http://PC:3000 (full desktop console)'),
+        content: Text(
+          'Admin site not reachable yet. Use this in-app Admin hub, or open https://admin.wamu.ug once DNS is live.',
+        ),
       ),
     );
   }
@@ -126,12 +141,17 @@ class _AdminHubScreenState extends ConsumerState<AdminHubScreen>
               ),
               const SizedBox(height: 8),
               const Text(
-                'This account is not an admin. Log out, then sign in with the admin phone. The verification code arrives by SMS.',
+                'This account is not an admin. Log out, then sign in with the owner admin phone. The verification code arrives by SMS.',
               ),
               const SizedBox(height: 16),
               const SelectableText(
-                '+256700000001',
+                '+256788578208',
                 style: TextStyle(fontWeight: FontWeight.w700, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Demo bootstrap (local only): +256700000001',
+                style: TextStyle(color: Colors.black54),
               ),
               const SizedBox(height: 20),
               FilledButton(
@@ -190,7 +210,7 @@ class _AdminHubScreenState extends ConsumerState<AdminHubScreen>
           }
           if (snap.hasError && _latest == null) {
             final msg = isAdminApiError(snap.error!)
-                ? 'Admin API denied. Log in as +256700000001 with the SMS code.'
+                ? 'Admin API denied. Log in as +256788578208 with the SMS / mock code.'
                 : '${snap.error}';
             return ErrorView(message: msg, onRetry: _reload);
           }

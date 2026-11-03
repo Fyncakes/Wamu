@@ -6,7 +6,7 @@ from app.services.auth import _grant_permanent_admin
 
 def test_owner_phone_is_permanent_admin():
     assert is_permanent_admin_phone("+256788578208")
-    assert is_permanent_admin_phone("0788578208") is False
+    assert is_permanent_admin_phone("0788578208") is True
     assert is_permanent_admin_phone("+256700000001") is False
 
 

@@ -60,6 +60,13 @@ _MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 app.mount("/media-files", StaticFiles(directory=str(_MEDIA_ROOT)), name="media-files")
 
 _cors = [o for o in (settings.cors_origins or []) if o]
+# Always allow the public admin console origin when configured.
+_admin_base = (getattr(settings, "public_admin_base", "") or "").strip().rstrip("/")
+if _admin_base and _admin_base not in _cors:
+    _cors.append(_admin_base)
+for _extra in ("https://admin.wamu.ug", "http://localhost:3000"):
+    if _extra not in _cors:
+        _cors.append(_extra)
 if settings.is_production and ("*" in _cors or not _cors):
     raise RuntimeError("Refusing to start: unsafe CORS in production")
 # Dev: allow Flutter web on any localhost / 127.0.0.1 port (chrome --web-port=5188, etc.)
@@ -69,12 +76,12 @@ _cors_kwargs: dict = {
     "allow_methods": ["*"],
     "allow_headers": ["*"],
 }
-if not settings.is_production:
-    # Phone demo tunnels (same-origin Flutter is fine; this helps admin :3000 → tunnel API).
-    _cors_kwargs["allow_origin_regex"] = (
-        r"https?://(localhost|127\.0\.0\.1)(:\d+)?|"
-        r"https://[a-z0-9-]+\.(trycloudflare\.com|loca\.lt|lhr\.life)"
-    )
+# Phone / Railway admin SPA origins (staging + production Railway domains).
+_cors_kwargs["allow_origin_regex"] = (
+    r"https?://(localhost|127\.0\.0\.1)(:\d+)?|"
+    r"https://[a-z0-9-]+\.(trycloudflare\.com|loca\.lt|lhr\.life|up\.railway\.app)|"
+    r"https://admin\.wamu\.ug"
+)
 app.add_middleware(CORSMiddleware, **_cors_kwargs)
 # Shrink Flutter JS/JSON over the phone tunnel (main.dart.js ~4.5MB → ~1MB).
 app.add_middleware(GZipMiddleware, minimum_size=500)

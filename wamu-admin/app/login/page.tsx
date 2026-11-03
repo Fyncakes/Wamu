@@ -7,11 +7,12 @@ import { api, ApiError } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/auth";
 
 const PHONE_REGEX = /^\+256[0-9]{9}$/;
+const OWNER_ADMIN_PHONE = "+256788578208";
 const DEMO_ADMIN_PHONE = "+256700000001";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState(DEMO_ADMIN_PHONE);
+  const [phone, setPhone] = useState(OWNER_ADMIN_PHONE);
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,9 @@ export default function LoginPage() {
 
       if (tokens.user?.role !== "ADMIN") {
         clearToken();
-        setError("This account is not an admin. Use the bootstrap admin phone.");
+        setError(
+          `This account is not an admin. Sign in as ${OWNER_ADMIN_PHONE} (or ${DEMO_ADMIN_PHONE} on demo).`,
+        );
         return;
       }
 
@@ -136,12 +139,12 @@ export default function LoginPage() {
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder={DEMO_ADMIN_PHONE}
+                    placeholder={OWNER_ADMIN_PHONE}
                     className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 shadow-sm outline-none ring-wamu-500 focus:border-wamu-500 focus:ring-2"
                   />
                   <p className="mt-1.5 text-xs text-slate-400">
-                    Demo admin: {DEMO_ADMIN_PHONE}. Shop admin: +256788578208.
-                    Sign in with the SMS code for that number.
+                    Owner admin: {OWNER_ADMIN_PHONE}. Demo: {DEMO_ADMIN_PHONE}.
+                    Use +256… format and the SMS / mock OTP for that number.
                   </p>
                 </div>
                 <button
