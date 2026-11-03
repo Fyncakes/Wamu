@@ -7,11 +7,13 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/calls/incoming_call_host.dart';
 import '../../features/cart/cart_provider.dart';
+import '../../features/chat/chat_repository.dart';
 import '../../features/chat/inbox_snapshot_provider.dart';
 import '../../features/discover/videos_feed_visibility.dart';
 import '../../features/profile/commerce_notif_provider.dart';
 import '../../core/notifications/local_notifications.dart';
 import '../../core/notifications/notification_sound_service.dart';
+import '../../core/push/chat_focus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/notification_settings_provider.dart';
 
@@ -27,6 +29,56 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   int _lastCommerceGen = 0;
+  Timer? _inboxPoll;
+
+  @override
+  void initState() {
+    super.initState();
+    // Poll inbox on every tab — Chats-only polling never fired the popup snackbar
+    // (that path suppressed banners while on Chats).
+    _inboxPoll = Timer.periodic(const Duration(seconds: 6), (_) {
+      unawaited(_pollInbox());
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_pollInbox());
+    });
+  }
+
+  @override
+  void dispose() {
+    _inboxPoll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _pollInbox() async {
+    if (!mounted) return;
+    final status = ref.read(authProvider).status;
+    if (status != AuthStatus.authenticated && status != AuthStatus.needsProfile) {
+      return;
+    }
+    try {
+      final list = await ref.read(chatRepositoryProvider).getConversations();
+      if (!mounted) return;
+      ref.read(inboxSnapshotProvider.notifier).updateFromConversations([
+        for (final c in list)
+          (
+            id: c.id,
+            unread: c.unreadCount,
+            name: c.displayName,
+            preview: c.lastMessagePreview,
+            muted: c.muted,
+          ),
+      ]);
+    } catch (_) {}
+  }
+
+  void _openChatFromBanner(String? conversationId) {
+    widget.navigationShell.goBranch(ShellTabs.chats);
+    ref.read(inboxSnapshotProvider.notifier).markSeen();
+    if (conversationId != null && conversationId.isNotEmpty) {
+      ref.read(pendingChatOpenProvider.notifier).state = conversationId;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,41 +100,42 @@ class _MainShellState extends ConsumerState<MainShell> {
     final onChats = widget.navigationShell.currentIndex == ShellTabs.chats;
 
     ref.listen<InboxSnapshot>(inboxSnapshotProvider, (prev, next) {
-      if (prev != null && next.totalUnread > prev.totalUnread) {
-        final prefs = ref.read(notificationSettingsProvider);
-        if (prefs.messageAlerts && prefs.soundsEnabled) {
-          unawaited(ref.read(notificationSoundServiceProvider).play(prefs));
-        }
-      }
-      if (widget.navigationShell.currentIndex == ShellTabs.chats) {
+      if (prev == null || next.totalUnread <= prev.totalUnread) return;
+
+      final open = ref.read(openChatIdProvider);
+      // Already reading that thread — no popup.
+      if (open != null &&
+          open.isNotEmpty &&
+          open == next.latestConversationId) {
         ref.read(inboxSnapshotProvider.notifier).markSeen();
         return;
       }
-      if (prev == null || next.totalUnread <= prev.totalUnread) return;
+
       final prefs = ref.read(notificationSettingsProvider);
+      if (prefs.messageAlerts && prefs.soundsEnabled) {
+        unawaited(ref.read(notificationSoundServiceProvider).play(prefs));
+      }
       if (!prefs.messageAlerts) return;
+
       final who = next.latestName ?? 'Someone';
       final preview = (next.latestPreview ?? 'New message').trim();
-      // OS heads-up while the app is open (FCM alone stays silent in foreground).
+      final convoId = next.latestConversationId;
       unawaited(
         showWamuLocalNotification(
           title: who,
           body: preview.isEmpty ? 'New message' : preview,
-          payload: 'chats',
+          payload: convoId == null || convoId.isEmpty ? 'chats' : 'chat:$convoId',
         ),
       );
       final messenger = ScaffoldMessenger.of(context);
       messenger.clearSnackBars();
       messenger.showSnackBar(
         SnackBar(
-          content: Text('$who: $preview'),
+          content: Text('$who: ${preview.isEmpty ? 'New message' : preview}'),
           action: SnackBarAction(
             label: 'Open',
             textColor: AppTheme.accentGreen,
-            onPressed: () {
-              widget.navigationShell.goBranch(ShellTabs.chats);
-              ref.read(inboxSnapshotProvider.notifier).markSeen();
-            },
+            onPressed: () => _openChatFromBanner(convoId),
           ),
           duration: const Duration(seconds: 4),
         ),

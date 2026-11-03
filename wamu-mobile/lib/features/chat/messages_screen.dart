@@ -111,6 +111,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       final rose = ref.read(inboxSnapshotProvider.notifier).updateFromConversations([
         for (final c in list)
           (
+            id: c.id,
             unread: c.unreadCount,
             name: c.displayName,
             preview: c.lastMessagePreview,

@@ -331,9 +331,9 @@ async def _start_direct_chat(
     for convo in result.scalars().unique().all():
         member_ids = {m.user_id for m in convo.members}
         if peer.id in member_ids and user.id in member_ids and len(member_ids) == 2:
-            mine = next((m for m in convo.members if m.user_id == user.id), None)
-            if mine is not None:
-                mine.hidden_at = None
+            # Unhide for both sides so the peer sees the thread again.
+            for m in convo.members:
+                m.hidden_at = None
             if data.initial_message:
                 await send_message(
                     db, user, convo.id, MessageCreate(body=data.initial_message)
