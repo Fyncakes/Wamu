@@ -25,11 +25,9 @@ from app.services.product import search as marketplace_search
 
 
 async def create_review(db: AsyncSession, user: User, data: ReviewCreate) -> Review:
-    existing = await db.scalar(
-        select(Review).where(Review.business_id == data.business_id, Review.user_id == user.id)
-    )
+    existing = await db.scalar(select(Review).where(Review.order_id == data.order_id))
     if existing:
-        raise HTTPException(status_code=400, detail="You already reviewed this business")
+        raise HTTPException(status_code=400, detail="You already reviewed this order")
     await get_business(db, data.business_id)
 
     order = await db.get(Order, data.order_id)

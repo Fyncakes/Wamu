@@ -746,7 +746,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(apiErrorMessage(e, fallback: 'Could not submit review'))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

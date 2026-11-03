@@ -1,4 +1,4 @@
-"""Reviews — one review per customer per business (MVP)."""
+"""Reviews — one review per delivered order."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ class Review(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "reviews"
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 5", name="reviews_rating_range"),
-        UniqueConstraint("business_id", "user_id", name="uq_review_business_user"),
+        UniqueConstraint("order_id", name="uq_review_order"),
     )
 
     business_id: Mapped[uuid.UUID] = mapped_column(

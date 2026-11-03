@@ -78,14 +78,13 @@ async def upsert_push_token(
 @router.delete("/push-token", status_code=204)
 async def delete_push_token(
     token: str = Query(..., min_length=8, max_length=512),
-    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await db.execute(
-        delete(DevicePushToken).where(
-            DevicePushToken.user_id == user.id,
-            DevicePushToken.token == token,
-        )
-    )
+    """Unregister by FCM/APNs token alone.
+
+    Logout clears the JWT before the client can call this, so auth cannot be
+    required. Possession of the device token is the capability to revoke it.
+    """
+    await db.execute(delete(DevicePushToken).where(DevicePushToken.token == token.strip()))
     await db.flush()
     return None
