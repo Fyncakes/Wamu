@@ -12,6 +12,7 @@ class OrderModel {
     this.createdAt,
     this.paymentStatus,
     this.paymentProvider,
+    this.fulfillment,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -26,6 +27,7 @@ class OrderModel {
       createdAt: json['created_at']?.toString(),
       paymentStatus: json['payment_status']?.toString(),
       paymentProvider: json['payment_provider']?.toString(),
+      fulfillment: json['fulfillment']?.toString(),
       items: rawItems
           .map((e) => OrderItemModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -42,6 +44,13 @@ class OrderModel {
   final String? createdAt;
   final String? paymentStatus;
   final String? paymentProvider;
+  final String? fulfillment;
+
+  /// Delivery rows exist only after paid DELIVERY orders — skip by-order polls otherwise.
+  bool get expectsDelivery {
+    if (fulfillment?.toUpperCase() != 'DELIVERY') return false;
+    return paymentStatus?.toUpperCase() == 'SUCCESS';
+  }
 
   /// Best thumbnail for list cards: first item photo, else shop logo.
   String? get previewImageUrl {

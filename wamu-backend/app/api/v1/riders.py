@@ -379,7 +379,7 @@ async def decline_fare_offer(
     return await fare_svc.resolve_fare_offer(db, user, offer_id, accept=False)
 
 
-@router.get("/deliveries/by-order/{order_id}", response_model=DeliveryResponse)
+@router.get("/deliveries/by-order/{order_id}", response_model=DeliveryResponse | None)
 async def delivery_for_order(
     order_id: UUID,
     user: User = Depends(get_current_user),

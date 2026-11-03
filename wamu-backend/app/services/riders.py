@@ -451,7 +451,9 @@ async def ensure_delivery_for_paid_order(db: AsyncSession, order: Order) -> Deli
     return delivery
 
 
-async def get_delivery_for_order(db: AsyncSession, user: User, order_id: uuid.UUID) -> DeliveryResponse:
+async def get_delivery_for_order(
+    db: AsyncSession, user: User, order_id: uuid.UUID
+) -> DeliveryResponse | None:
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -471,7 +473,8 @@ async def get_delivery_for_order(db: AsyncSession, user: User, order_id: uuid.UU
         .where(Delivery.order_id == order_id)
     )
     if not delivery:
-        raise HTTPException(status_code=404, detail="No delivery for this order")
+        # Clients poll before payment creates a Delivery row — 200 null, not 404.
+        return None
     if delivery.rider and delivery.status not in (
         DeliveryStatus.DELIVERED.value,
         DeliveryStatus.CANCELLED.value,

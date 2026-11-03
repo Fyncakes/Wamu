@@ -1179,6 +1179,7 @@ class _ManageOrdersScreenState extends ConsumerState<ManageOrdersScreen>
     for (final order in orders) {
       final s = order.status.toUpperCase();
       if (s == 'CANCELLED' || s == 'PENDING') continue;
+      if (!order.expectsDelivery) continue;
       deliveries[order.id] = await riderRepo.deliveryForOrder(order.id);
     }
     final openDisputes = <String, String>{};

@@ -79,16 +79,19 @@ def verify_provider_webhook(provider: str, *, body: bytes, request: Request) -> 
     else:
         signature = _header(request, "X-Wamu-Signature")
 
-    # Unsigned callbacks are only for a laptop lab. Staging is on the public
-    # internet, so a missing signature there is rejected.
+    # MoMo Collection/Disbursement callbacks do not carry an HMAC header.
+    # When MTN_WEBHOOK_SECRET / AIRTEL_WEBHOOK_SECRET is unset, accept unsigned
+    # provider callbacks; process_webhook still requires a known provider_reference.
+    # MOCK always needs X-Wamu-Signature outside local mock-demo.
     environment = getattr(settings, "environment", "staging")
-    allow_unsigned = not signature and environment == "development" and (
-        (
-            settings.payment_mock_auto_success
+    allow_unsigned = not signature and (
+        (key == "MTN" and not (settings.mtn_webhook_secret or "").strip())
+        or (key == "AIRTEL" and not (settings.airtel_webhook_secret or "").strip())
+        or (
+            environment == "development"
+            and settings.payment_mock_auto_success
             and key in {"MOCK", "MTN", "AIRTEL"}
         )
-        or (key == "MTN" and not (settings.mtn_webhook_secret or "").strip())
-        or (key == "AIRTEL" and not (settings.airtel_webhook_secret or "").strip())
     )
     if allow_unsigned:
         return

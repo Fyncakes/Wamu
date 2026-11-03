@@ -81,9 +81,11 @@ async def webhook(
 ):
     """
     Provider callbacks. Signatures:
-    - MOCK: `X-Wamu-Signature: sha256=<hmac>`
-    - MTN: `X-MTN-Signature` or `X-Callback-Signature`
-    - AIRTEL: `X-Airtel-Signature`
+    - MOCK: `X-Wamu-Signature: sha256=<hmac>` (always required outside local mock-demo)
+    - MTN: optional `X-MTN-Signature` / `X-Callback-Signature` when MTN_WEBHOOK_SECRET is set;
+      MoMo Open API itself does not sign collection callbacks, so unsigned MTN is accepted
+      when that secret is empty (status still requires a known provider_reference)
+    - AIRTEL: same pattern with AIRTEL_WEBHOOK_SECRET / `X-Airtel-Signature`
 
     MTN MoMo docs: Wallet Platform delivers callbacks with PUT (also allow POST).
     Callback is sent once — we still poll GET /requesttopay/{id} as fallback.

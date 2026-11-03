@@ -454,11 +454,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
     try {
       final order = await ref.read(ordersRepositoryProvider).getOrder(widget.orderId);
       Map<String, dynamic>? delivery;
-      try {
-        delivery =
-            await ref.read(ridersRepositoryProvider).deliveryForOrder(widget.orderId);
-      } catch (_) {
-        delivery = null;
+      if (order.expectsDelivery) {
+        try {
+          delivery =
+              await ref.read(ridersRepositoryProvider).deliveryForOrder(widget.orderId);
+        } catch (_) {
+          delivery = null;
+        }
       }
       if (!mounted) return;
       setState(() {
