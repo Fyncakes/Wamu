@@ -3998,7 +3998,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 }
                                 if (msg.messageType == 'ORDER_CARD') {
                                   return Align(
-                                    alignment: Alignment.centerLeft,
+                                    alignment: msg.isMine
+                                        ? Alignment.centerLeft
+                                        : Alignment.centerRight,
                                     child: Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: _orderCardBubble(msg),
@@ -4008,8 +4010,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 if (msg.messageType == 'FARE_OFFER') {
                                   return Align(
                                     alignment: msg.isMine
-                                        ? Alignment.centerRight
-                                        : Alignment.centerLeft,
+                                        ? Alignment.centerLeft
+                                        : Alignment.centerRight,
                                     child: Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: _fareOfferBubble(msg),
@@ -4023,8 +4025,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 final voice = !album && msg.isVoice;
                                 return Align(
                                   alignment: msg.isMine
-                                      ? Alignment.centerRight
-                                      : Alignment.centerLeft,
+                                      ? Alignment.centerLeft
+                                      : Alignment.centerRight,
                                   child: GestureDetector(
                                     onTap: _selecting ? () => _toggleSelect(last) : null,
                                     onLongPress: () {
@@ -4063,8 +4065,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         borderRadius: BorderRadius.only(
                                           topLeft: Radius.circular(12),
                                           topRight: Radius.circular(12),
-                                          bottomLeft: Radius.circular(msg.isMine ? 12 : 4),
-                                          bottomRight: Radius.circular(msg.isMine ? 4 : 12),
+                                          bottomLeft: Radius.circular(msg.isMine ? 4 : 12),
+                                          bottomRight: Radius.circular(msg.isMine ? 12 : 4),
                                         ),
                                         border: selected
                                             ? Border.all(color: AppTheme.accentGreen, width: 2)
