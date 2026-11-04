@@ -25,9 +25,6 @@ from app.services.product import search as marketplace_search
 
 
 async def create_review(db: AsyncSession, user: User, data: ReviewCreate) -> Review:
-    existing = await db.scalar(select(Review).where(Review.order_id == data.order_id))
-    if existing:
-        raise HTTPException(status_code=400, detail="You already reviewed this order")
     await get_business(db, data.business_id)
 
     order = await db.get(Order, data.order_id)
@@ -48,9 +45,25 @@ async def create_review(db: AsyncSession, user: User, data: ReviewCreate) -> Rev
         from app.models.rider import Delivery
 
         delivery = await db.scalar(select(Delivery).where(Delivery.order_id == order.id))
-        if not delivery or not delivery.rider_id:
-            raise HTTPException(status_code=400, detail="No rider to rate for this order")
-        rider_id = delivery.rider_id
+        # Pickup / unassigned: ignore rider stars instead of failing the whole review.
+        if delivery and delivery.rider_id:
+            rider_id = delivery.rider_id
+
+    existing = await db.scalar(select(Review).where(Review.order_id == data.order_id))
+    if existing:
+        if existing.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Not your review")
+        existing.rating = data.rating
+        existing.comment = data.comment
+        if rider_id is not None:
+            existing.rider_id = rider_id
+            existing.rider_rating = data.rider_rating
+        await db.flush()
+        await _recompute_business_rating(db, data.business_id)
+        if existing.rider_id and existing.rider_rating is not None:
+            await _recompute_rider_rating(db, existing.rider_id)
+        await db.refresh(existing)
+        return existing
 
     review = Review(
         business_id=data.business_id,

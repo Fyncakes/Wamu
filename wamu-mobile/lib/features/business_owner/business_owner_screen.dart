@@ -1279,7 +1279,9 @@ class _ManageOrdersScreenState extends ConsumerState<ManageOrdersScreen>
       if (mounted) _reload();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(apiErrorMessage(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

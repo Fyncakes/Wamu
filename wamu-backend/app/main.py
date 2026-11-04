@@ -7,11 +7,12 @@ Thin app factory: middleware + routers. Business logic lives in services/.
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import api_router
 from app.core.config import get_settings
@@ -244,6 +245,27 @@ async def absolutize_media_urls_middleware(request: Request, call_next):
 
 
 app.include_router(api_router)
+
+
+@app.exception_handler(StarletteHTTPException)
+@app.exception_handler(HTTPException)
+async def http_exception_logger(request: Request, exc: StarletteHTTPException | HTTPException):
+    """Surface 4xx detail in Railway access logs (uvicorn only logs the status line)."""
+    if 400 <= int(exc.status_code) < 500 and request.url.path.startswith("/api/"):
+        import logging
+
+        logging.getLogger("wamu.http").warning(
+            "%s %s → %s detail=%s",
+            request.method,
+            request.url.path,
+            exc.status_code,
+            exc.detail,
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=getattr(exc, "headers", None) or None,
+    )
 
 
 @app.get("/health")
